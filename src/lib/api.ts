@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -13,6 +13,7 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
     ...(init.headers as Record<string, string> | undefined),
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -531,7 +532,10 @@ export async function uploadImage(file: File): Promise<{ url: string }> {
 
   const res = await fetch(`${API_URL}/api/uploads/image`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      "ngrok-skip-browser-warning": "true",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   });
   if (!res.ok) {

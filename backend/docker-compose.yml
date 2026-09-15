@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: nemora-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nemora
+      POSTGRES_USER: nemora
+      POSTGRES_PASSWORD: nemora
+    ports:
+      - "5432:5432"
+    volumes:
+      - nemora_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  nemora_postgres_data:

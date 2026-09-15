@@ -1,0 +1,221 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  
+  /* Pharma CRM Color Palette */
+  --color-pharma-50: #f0f5ff;
+  --color-pharma-100: #e0ecff;
+  --color-pharma-200: #c7dfff;
+  --color-pharma-300: #a3c9ff;
+  --color-pharma-400: #78a9ff;
+  --color-pharma-500: #4f86f7;
+  --color-pharma-600: #3461e0;
+  --color-pharma-700: #2a4ac7;
+  --color-pharma-800: #273ea1;
+  --color-pharma-900: #233481;
+  --color-pharma-950: #181e4a;
+
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+}
+
+:root {
+  --background: #f8fafc;
+  --foreground: #1e293b;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-slate-100);
+}
+.dark ::-webkit-scrollbar-track {
+  background: var(--color-slate-800);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-slate-300);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-400);
+}
+
+/* Leaflet map fixes */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+}
+.leaflet-container a {
+  color: var(--color-pharma-600);
+}
+
+/* Mobile-first touch targets */
+@media (max-width: 768px) {
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--color-pharma-500);
+  outline-offset: 2px;
+}
+
+/* ===== Landing page animations ===== */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUpDelay1 {
+  0%, 15% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUpDelay2 {
+  0%, 35% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUpDelay3 {
+  0%, 55% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseLogo {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 20px 10px rgba(20, 184, 166, 0.1); }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-20px) rotate(10deg); }
+  50% { transform: translateY(-10px) rotate(-5deg); }
+  75% { transform: translateY(-25px) rotate(5deg); }
+}
+
+@keyframes float2 {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-30px) rotate(-15deg); }
+  66% { transform: translateY(-15px) rotate(10deg); }
+}
+
+@keyframes float3 {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(-10deg); }
+}
+
+@keyframes float4 {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  25% { transform: translateY(-15px) rotate(8deg) scale(1.1); }
+  75% { transform: translateY(-25px) rotate(-3deg) scale(0.95); }
+}
+
+@keyframes pillShape1 {
+  0%, 100% { transform: translateY(0) rotate(45deg); opacity: 0.15; }
+  50% { transform: translateY(-30px) rotate(55deg); opacity: 0.25; }
+}
+
+@keyframes pillShape2 {
+  0%, 100% { transform: translateY(0) rotate(-30deg); opacity: 0.12; }
+  50% { transform: translateY(-25px) rotate(-20deg); opacity: 0.2; }
+}
+
+@keyframes pillShape3 {
+  0%, 100% { transform: translateY(0) rotate(60deg); opacity: 0.1; }
+  50% { transform: translateY(-35px) rotate(70deg); opacity: 0.18; }
+}
+
+@keyframes pillShape4 {
+  0%, 100% { transform: translateY(0) rotate(-15deg) scale(0.8); opacity: 0.08; }
+  50% { transform: translateY(-20px) rotate(-5deg) scale(1); opacity: 0.15; }
+}
+
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+.animate-slide-up { animation: slide-up 0.3s ease-out; }
+.animate-pulse-soft { animation: pulse-soft 2s ease-in-out infinite; }
+
+.animate-fade-in-up { animation: fadeInUp 0.8s ease-out forwards; opacity: 0; }
+.animate-fade-in-up-1 { animation: fadeInUpDelay1 0.8s ease-out forwards; opacity: 0; }
+.animate-fade-in-up-2 { animation: fadeInUpDelay2 0.8s ease-out forwards; opacity: 0; }
+.animate-fade-in-up-3 { animation: fadeInUpDelay3 0.8s ease-out forwards; opacity: 0; }
+.animate-pulse-logo { animation: pulseLogo 3s ease-in-out infinite; }
+.animate-gradient { animation: gradientShift 8s ease infinite; background-size: 200% 200%; }
+.animate-float1 { animation: float1 6s ease-in-out infinite; }
+.animate-float2 { animation: float2 8s ease-in-out infinite; }
+.animate-float3 { animation: float3 7s ease-in-out infinite; }
+.animate-float4 { animation: float4 9s ease-in-out infinite; }
+.animate-pill1 { animation: pillShape1 10s ease-in-out infinite; }
+.animate-pill2 { animation: pillShape2 12s ease-in-out infinite; }
+.animate-pill3 { animation: pillShape3 11s ease-in-out infinite; }
+.animate-pill4 { animation: pillShape4 14s ease-in-out infinite; }
+
+/* Smooth scrolling */
+html { scroll-behavior: smooth; }

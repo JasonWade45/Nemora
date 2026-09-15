@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  MEDICAL_REP
+}
+
+enum DoctorPriority {
+  A
+  B
+  C
+}
+
+enum InterestLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum VisitPurpose {
+  DETAILING
+  FOLLOW_UP
+  PRODUCT_LAUNCH
+  SAMPLE_DELIVERY
+  MEDICAL_EDUCATION
+  RELATIONSHIP_BUILDING
+}
+
+enum VisitStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DoctorResponse {
+  VERY_INTERESTED
+  INTERESTED
+  NEUTRAL
+  NOT_INTERESTED
+}
+
+enum FollowUpActionType {
+  CALL
+  VISIT
+  SEND_INFO
+  OTHER
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  MISSED
+}
+
+enum NotificationType {
+  VISIT
+  FOLLOW_UP
+  TARGET
+  SYSTEM
+  ASSIGNMENT
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+model Company {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  logo         String?
+  settings     String   @default("{}")
+  subscription String   @default("BASIC")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users      User[]
+  doctors    Doctor[]
+  specialties Specialty[]
+  products   Product[]
+  visits     Visit[]
+  followUps  FollowUp[]
+  targets    Target[]
+  auditLogs  AuditLog[]
+  orders     Order[]
+  subscriptionDetails Subscription?
+
+  @@index([slug])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  name          String
+  phone         String?
+  employeeId    String?
+  role          UserRole
+  profileImage  String?
+  jobTitle      String?
+  isActive      Boolean  @default(true)
+  companyId     String
+  managerId     String?
+  workingDays   String   @default("[0,1,2,3,4]")
+  workingHours  String   @default("{\"start\":\"09:00\",\"end\":\"17:00\"}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company        Company  @relation(fields: [companyId], references: [id])
+  manager        User?    @relation("UserHierarchy", fields: [managerId], references: [id])
+  subordinates   User[]   @relation("UserHierarchy")
+  repDoctorLinks RepDoctor[]
+  visits         Visit[]
+  followUps      FollowUp[]
+  targets        Target[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  orders         Order[]
+  connectivityLogs ConnectivityLog[]
+
+  @@index([companyId])
+  @@index([managerId])
+  @@index([email])
+}
+
+model Specialty {
+  id        String  @id @default(cuid())
+  name      String
+  companyId String
+
+  company Company  @relation(fields: [companyId], references: [id])
+  doctors Doctor[]
+
+  @@index([companyId])
+}
+
+model Doctor {
+  id            String        @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  specialtyId   String
+  subSpecialty  String?
+  gender        String?
+  clinicName    String?
+  address       String?
+  governorate   String?
+  city          String?
+  latitude      Float?
+  longitude     Float?
+  priority      DoctorPriority @default(B)
+  companyId     String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  company      Company          @relation(fields: [companyId], references: [id])
+  specialty    Specialty        @relation(fields: [specialtyId], references: [id])
+  schedules    DoctorSchedule[]
+  locations    DoctorLocation[]
+  repDoctorLinks RepDoctor[]
+  visits       Visit[]
+  followUps    FollowUp[]
+  orders       Order[]
+
+  @@index([companyId])
+  @@index([specialtyId])
+  @@index([governorate])
+}
+
+model DoctorSchedule {
+  id              String @id @default(cuid())
+  doctorId        String
+  doctorLocationId String?
+  dayOfWeek       Int
+  startTime       String
+  endTime         String
+
+  doctor     Doctor          @relation(fields: [doctorId], references: [id])
+  location   DoctorLocation? @relation(fields: [doctorLocationId], references: [id])
+
+  @@index([doctorId])
+}
+
+model DoctorLocation {
+  id        String  @id @default(cuid())
+  doctorId  String
+  name      String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  isPrimary Boolean @default(false)
+
+  doctor    Doctor          @relation(fields: [doctorId], references: [id])
+  schedules DoctorSchedule[]
+  visits    Visit[]
+
+  @@index([doctorId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  genericName String?
+  category    String?
+  description String?
+  dosageInfo  String?
+  companyId   String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  company      Company        @relation(fields: [companyId], references: [id])
+  visitProducts VisitProduct[]
+  orderItems   OrderItem[]
+
+  @@index([companyId])
+}
+
+model RepDoctor {
+  id           String        @id @default(cuid())
+  repId        String
+  doctorId     String
+  interestLevel InterestLevel @default(MEDIUM)
+  notes        String?
+  createdAt    DateTime      @default(now())
+
+  rep    User   @relation(fields: [repId], references: [id])
+  doctor Doctor @relation(fields: [doctorId], references: [id])
+
+  @@unique([repId, doctorId])
+  @@index([repId])
+  @@index([doctorId])
+}
+
+model Visit {
+  id                String        @id @default(cuid())
+  repId             String
+  doctorId          String
+  doctorLocationId  String?
+  visitPurpose      VisitPurpose
+  status            VisitStatus   @default(IN_PROGRESS)
+  startTime         DateTime
+  endTime           DateTime?
+  duration          Int?
+  latitude          Float?
+  longitude         Float?
+  distanceFromDoctor Float?
+  isVerified        Boolean       @default(false)
+  doctorResponse    DoctorResponse?
+  notes             String?
+  nextFollowUpDate  DateTime?
+  nextFollowUpType  String?
+  nextFollowUpNotes String?
+  companyId         String
+  createdAt         DateTime      @default(now())
+
+  rep              User            @relation(fields: [repId], references: [id])
+  doctor           Doctor          @relation(fields: [doctorId], references: [id])
+  doctorLocation   DoctorLocation? @relation(fields: [doctorLocationId], references: [id])
+  company          Company         @relation(fields: [companyId], references: [id])
+  visitProducts    VisitProduct[]
+  followUps        FollowUp[]
+
+  @@index([repId])
+  @@index([doctorId])
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+model VisitProduct {
+  id        String @id @default(cuid())
+  visitId   String
+  productId String
+
+  visit   Visit   @relation(fields: [visitId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([visitId, productId])
+  @@index([visitId])
+  @@index([productId])
+}
+
+model FollowUp {
+  id          String            @id @default(cuid())
+  repId       String
+  doctorId    String
+  visitId     String?
+  dueDate     DateTime
+  actionType  FollowUpActionType
+  notes       String?
+  status      FollowUpStatus    @default(PENDING)
+  completedAt DateTime?
+  companyId   String
+  createdAt   DateTime          @default(now())
+
+  rep    User           @relation(fields: [repId], references: [id])
+  doctor Doctor         @relation(fields: [doctorId], references: [id])
+  visit  Visit?         @relation(fields: [visitId], references: [id])
+  company Company       @relation(fields: [companyId], references: [id])
+
+  @@index([repId])
+  @@index([doctorId])
+  @@index([companyId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model Target {
+  id          String   @id @default(cuid())
+  repId       String
+  month       Int
+  year        Int
+  totalVisits Int      @default(0)
+  totalDoctors Int     @default(0)
+  newDoctors  Int      @default(0)
+  followUps   Int      @default(0)
+  companyId   String
+  createdAt   DateTime @default(now())
+
+  rep    User    @relation(fields: [repId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([repId, month, year])
+  @@index([repId])
+  @@index([companyId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String   @default("{}")
+  companyId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([entity, entityId])
+}
+
+model Order {
+  id         String   @id @default(cuid())
+  repId      String
+  doctorId   String
+  status     String   @default("PENDING") // PENDING, CONFIRMED, DELIVERED, CANCELLED
+  notes      String?
+  totalItems Int      @default(0)
+  companyId  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rep     User    @relation(fields: [repId], references: [id])
+  doctor  Doctor  @relation(fields: [doctorId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  items   OrderItem[]
+
+  @@index([repId])
+  @@index([doctorId])
+  @@index([companyId])
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int    @default(1)
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([orderId, productId])
+}
+
+model Subscription {
+  id        String           @id @default(cuid())
+  companyId String           @unique
+  plan      SubscriptionPlan @default(BASIC)
+  maxUsers  Int              @default(5)
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean          @default(true)
+
+  company Company @relation(fields: [companyId], references: [id])
+}
+
+model ConnectivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  isOnline  Boolean  @default(true)
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}

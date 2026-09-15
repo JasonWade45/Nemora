@@ -1,0 +1,50 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: var(--font-arabic), var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+html { font-family: var(--font-arabic), var(--font-inter), system-ui, sans-serif; }
+
+body { font-family: var(--font-arabic), var(--font-inter), system-ui, sans-serif; }
+
+h1, h2, h3, h4, h5, h6, button, input, select, textarea {
+  font-family: var(--font-arabic), var(--font-inter), system-ui, sans-serif;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.leaflet-container { font-family: var(--font-arabic), var(--font-inter), system-ui, sans-serif; }
+.leaflet-popup-content-wrapper { border-radius: 12px; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(14, 165, 233, 0); }
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+
+.animate-slide-in-down {
+  animation: slideInDown 0.4s ease-out;
+}

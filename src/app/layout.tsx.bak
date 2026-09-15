@@ -1,0 +1,44 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/components/auth-provider";
+import { AuthProvider as MockAuthProvider } from "@/lib/auth-context";
+import { ThemeProvider } from "@/components/theme-provider";
+import { LocaleProvider } from "@/lib/locale-context";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "PharmaTrack - Pharmaceutical Field Force CRM",
+  description: "Manage medical reps, doctors, visits, and field sales",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="ar" dir="rtl" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+        <ThemeProvider>
+          <LocaleProvider>
+            <AuthProvider>
+              <MockAuthProvider>
+                {children}
+              </MockAuthProvider>
+            </AuthProvider>
+          </LocaleProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}

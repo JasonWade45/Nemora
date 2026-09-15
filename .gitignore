@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Env files — CRITICAL
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+prisma/dev.db*
+
+# Uploads (backend)
+backend/uploads/*
+
+# Misc
+.DS_Store
+*.log
+.vscode/
+.idea/
+_backup_old/
+
+# Backups with secrets
+*.env.backup
+.env.backup
+*.bak
+
+# Nested repos
+Nemora-project/
+
+# TypeScript cache
+tsconfig.tsbuildinfo

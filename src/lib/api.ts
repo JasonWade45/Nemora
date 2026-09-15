@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_URL = "https://regulate-shabby-repossess.ngrok-free.dev";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

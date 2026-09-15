@@ -567,3 +567,95 @@ export const PRODUCT_CATEGORIES = [
   "مسكنات",
   "أخرى",
 ];
+
+// ============ Analytics ============
+
+export type AnalyticsOverview = {
+  totals: {
+    visits: number;
+    completed: number;
+    unique_doctors: number;
+    unique_reps: number;
+    conversion_rate: number;
+  };
+  responses: {
+    very_interested: number;
+    interested: number;
+    neutral: number;
+    not_interested: number;
+  };
+  top_products: Array<{ id: string; name: string; category: string | null; count: number }>;
+  top_reps: Array<{ id: string; name: string; count: number }>;
+  top_areas: Array<{ area: string; count: number }>;
+  top_specialties: Array<{ specialty: string; count: number }>;
+  visit_trend: Array<{ date: string; count: number }>;
+};
+
+export type AnalyticsFilters = {
+  specialties: string[];
+  areas: string[];
+  products: Array<{ id: string; name: string }>;
+  reps: Array<{ id: string; name: string; role: string }>;
+};
+
+export async function getAnalyticsFilters(): Promise<AnalyticsFilters> {
+  return apiFetch<AnalyticsFilters>("/api/analytics/filters");
+}
+
+export async function getAnalyticsOverview(params?: {
+  days?: number;
+  specialty?: string;
+  area?: string;
+  rep_id?: string;
+  product_id?: string;
+}): Promise<AnalyticsOverview> {
+  const q = new URLSearchParams();
+  if (params?.days) q.set("days", String(params.days));
+  if (params?.specialty) q.set("specialty", params.specialty);
+  if (params?.area) q.set("area", params.area);
+  if (params?.rep_id) q.set("rep_id", params.rep_id);
+  if (params?.product_id) q.set("product_id", params.product_id);
+  const suffix = q.toString() ? "?" + q.toString() : "";
+  return apiFetch<AnalyticsOverview>(`/api/analytics/overview${suffix}`);
+}
+
+// ============ Analytics Details ============
+
+export type AnalyticsDetailsItem = {
+  id: string;
+  doctor_name?: string;
+  doctor_specialty?: string | null;
+  doctor_area?: string | null;
+  rep_name?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  specialty?: string | null;
+  area?: string | null;
+  phone?: string | null;
+  status?: string;
+  checked_in_at?: string | null;
+  doctor_response?: string | null;
+  duration_minutes?: number | null;
+  count: number;
+};
+
+export async function getAnalyticsDetails(params: {
+  type: "visits" | "completed" | "doctors" | "reps" | "responses";
+  response_type?: string;
+  days?: number;
+  specialty?: string;
+  area?: string;
+  rep_id?: string;
+  product_id?: string;
+}): Promise<{ type: string; items: AnalyticsDetailsItem[]; total: number }> {
+  const q = new URLSearchParams();
+  q.set("type", params.type);
+  if (params.response_type) q.set("response_type", params.response_type);
+  if (params.days) q.set("days", String(params.days));
+  if (params.specialty) q.set("specialty", params.specialty);
+  if (params.area) q.set("area", params.area);
+  if (params.rep_id) q.set("rep_id", params.rep_id);
+  if (params.product_id) q.set("product_id", params.product_id);
+  return apiFetch(`/api/analytics/details?${q.toString()}`);
+}

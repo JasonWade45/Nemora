@@ -2,164 +2,162 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, Users, UserPlus, MapPin, Target, 
-  Settings, Building2, LogOut, Menu, X, ChevronDown,
-  Building, Package, FileText, Bell, HelpCircle
+import { usePathname, useRouter } from 'next/navigation';
+import {
+  LayoutDashboard, Users, UserPlus, MapPin, Target,
+  Settings, LogOut, Menu, X, Building2, Package,
 } from 'lucide-react';
-import { useAuth } from '@/lib/auth-context';
-import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
+import { useLanguage } from '@/lib/language-context';
+import { clearToken, getToken } from '@/lib/api';
 
 const ADMIN_NAV_ITEMS = [
-  { href: '/admin/dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
-  { href: '/admin/my-reps', label: 'مندوبيني', icon: UserPlus },
-  { href: '/admin/visits', label: 'زيارات الفريق', icon: MapPin },
-  { href: '/admin/doctors', label: 'الأطباء', icon: Users },
-  { href: '/admin/products', label: 'المنتجات', icon: Package },
-  { href: '/admin/settings', label: 'الإعدادات', icon: Settings },
+  { href: '/admin', labelAr: 'لوحة التحكم', labelEn: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/my-reps', labelAr: 'مندوبيني', labelEn: 'My Reps', icon: UserPlus },
+  { href: '/admin/visits', labelAr: 'زيارات الفريق', labelEn: 'Team Visits', icon: MapPin },
+  { href: '/admin/analytics', labelAr: 'التحليلات', labelEn: 'Analytics', icon: Target },
+  { href: '/admin/doctors', labelAr: 'الأطباء', labelEn: 'Doctors', icon: Users },
+  { href: '/admin/products', labelAr: 'المنتجات', labelEn: 'Products', icon: Package },
+  { href: '/admin/settings', labelAr: 'الإعدادات', labelEn: 'Settings', icon: Settings },
 ];
 
 const MANAGER_NAV_ITEMS = [
-  { href: '/manager/dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
-  { href: '/manager/team', label: 'الفريق كامل', icon: Users },
-  { href: '/manager/admins', label: 'المشرفين', icon: UserPlus },
-  { href: '/manager/visits', label: 'كل الزيارات', icon: MapPin },
-  { href: '/manager/doctors', label: 'الأطباء', icon: Building },
-  { href: '/manager/products', label: 'المنتجات', icon: Package },
-  { href: '/manager/targets', label: 'الأهداف', icon: Target },
-  { href: '/manager/reports', label: 'التقارير', icon: FileText },
+  { href: '/manager', labelAr: 'لوحة التحكم', labelEn: 'Dashboard', icon: LayoutDashboard },
+  { href: '/manager/team', labelAr: 'الفريق كامل', labelEn: 'Full Team', icon: Users },
+  { href: '/manager/visits', labelAr: 'كل الزيارات', labelEn: 'All Visits', icon: MapPin },
+  { href: '/manager/analytics', labelAr: 'التحليلات', labelEn: 'Analytics', icon: Target },
+  { href: '/manager/products', labelAr: 'المنتجات', labelEn: 'Products', icon: Package },
 ];
 
-export function Sidebar() {
-  const { user, logout, company } = useAuth();
+type SidebarProps = {
+  role: 'ADMIN' | 'MANAGER';
+};
+
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { lang } = useLanguage();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  const navItems = user?.role === 'ADMIN' ? ADMIN_NAV_ITEMS : MANAGER_NAV_ITEMS;
+  const navItems = role === 'ADMIN' ? ADMIN_NAV_ITEMS : MANAGER_NAV_ITEMS;
+  const isAr = lang === 'ar';
+
+  function logout() {
+    clearToken();
+    router.push('/login');
+  }
 
   return (
     <>
-      {/* Mobile overlay */}
       {mobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
-          fixed lg:static inset-y-0 left-0 z-50 bg-white border-r border-slate-200
+          fixed lg:static inset-y-0 start-0 z-50
+          bg-slate-900 dark:bg-slate-950 border-e border-slate-800
           transition-all duration-300 ease-in-out flex flex-col
           ${isCollapsed ? 'w-20' : 'w-64'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 rtl:translate-x-full rtl:lg:translate-x-0'}
         `}
-        aria-label="Main navigation"
       >
         {/* Header */}
-        <div className={`
-          flex items-center justify-between h-16 px-4 border-b border-slate-200
-          ${isCollapsed ? 'justify-center' : ''}
-        `}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} h-16 px-4 border-b border-slate-800`}>
           {!isCollapsed && (
-            <Link href={user?.role === 'ADMIN' ? '/admin/dashboard' : '/manager/dashboard'} className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-pharma-600 flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
+            <Link href={role === 'ADMIN' ? '/admin' : '/manager'} className="flex items-center gap-2 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-teal-400 flex items-center justify-center shrink-0 shadow-lg shadow-sky-500/30">
+                <span className="text-white text-sm font-bold">N</span>
               </div>
-              <span className="font-semibold text-slate-900 truncate">{company?.name || 'PharmaCRM'}</span>
+              <div className="min-w-0">
+                <div className="font-bold text-white text-sm truncate tracking-tight">NEMORA</div>
+                <div className="text-[9px] text-slate-400 truncate">
+                  {isAr ? 'إدارة الفريق' : 'Field Force'}
+                </div>
+              </div>
             </Link>
           )}
           {isCollapsed && (
-            <Link href={user?.role === 'ADMIN' ? '/admin/dashboard' : '/manager/dashboard'} className="flex items-center justify-center">
-              <div className="w-8 h-8 rounded-lg bg-pharma-600 flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
+            <Link href={role === 'ADMIN' ? '/admin' : '/manager'} className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-teal-400 flex items-center justify-center">
+              <span className="text-white text-sm font-bold">N</span>
             </Link>
           )}
-
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className={`
-              p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700
-              lg:hidden ${isCollapsed ? 'ml-auto' : 'ml-2'}
-            `}
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!isCollapsed}
+            className={`p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white hidden lg:flex ${isCollapsed ? 'ms-0' : ''}`}
           >
-            {isCollapsed ? <Menu className="w-5 h-5" /> : <X className="w-5 h-5" />}
+            <Menu className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 lg:hidden"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Main menu">
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const isActive = pathname === item.href || (item.href !== `/${role}` && pathname.startsWith(item.href));
+            const label = isAr ? item.labelAr : item.labelEn;
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setMobileOpen(false)}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
                   ${isActive
-                    ? 'bg-pharma-50 text-pharma-700'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}
+                    ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
                   ${isCollapsed ? 'justify-center' : ''}
                 `}
-                title={isCollapsed ? item.label : undefined}
-                aria-current={isActive ? 'page' : undefined}
+                title={isCollapsed ? label : undefined}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
-                {!isCollapsed && <span className="truncate">{item.label}</span>}
+                <Icon className={`w-4.5 h-4.5 flex-shrink-0 ${isActive ? 'text-sky-400' : ''}`} style={{ width: 18, height: 18 }} />
+                {!isCollapsed && <span className="truncate">{label}</span>}
               </Link>
             );
           })}
         </nav>
 
         {/* Footer */}
-        <div className={`
-          p-4 border-t border-slate-200
-          ${isCollapsed ? 'items-center' : ''}
-        `}>
-          {!isCollapsed ? (
-            <div className="flex items-center gap-3">
-              <Avatar name={user?.name} size="sm" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
-                <p className="text-xs text-slate-500 capitalize">{user?.role?.toLowerCase().replace('_', ' ')}</p>
-              </div>
+        <div className="p-3 border-t border-slate-800 space-y-2">
+          {!isCollapsed && (
+            <div className="space-y-1">
+              <ThemeToggle />
+              <LanguageToggle />
             </div>
-          ) : (
-            <Avatar name={user?.name} size="sm" />
           )}
 
-          {!isCollapsed && (
-            <div className="mt-3 flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start gap-2"
-                onClick={logout}
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
-              </Button>
+          {isCollapsed && (
+            <div className="flex flex-col items-center gap-1">
+              <ThemeToggle compact />
+              <LanguageToggle compact />
             </div>
           )}
+
+          <button
+            onClick={logout}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition ${isCollapsed ? 'justify-center' : ''}`}
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            {!isCollapsed && <span>{isAr ? 'تسجيل خروج' : 'Sign out'}</span>}
+          </button>
         </div>
       </aside>
 
-      {/* Mobile menu button */}
       <button
-        className="lg:hidden fixed bottom-6 right-4 z-50 p-3 bg-pharma-600 text-white rounded-full shadow-lg"
+        className="lg:hidden fixed bottom-6 end-4 z-50 p-3 bg-sky-500 text-white rounded-full shadow-lg"
         onClick={() => setMobileOpen(true)}
-        aria-label="Open menu"
       >
         <Menu className="w-6 h-6" />
       </button>

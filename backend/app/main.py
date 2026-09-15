@@ -15,6 +15,7 @@ from app.modules.tracking.routes import router as tracking_router
 from app.modules.visits.routes import router as visits_router
 from app.modules.products.routes import router as products_router
 from app.modules.uploads.routes import router as uploads_router
+from app.modules.analytics.routes import router as analytics_router
 
 settings = get_settings()
 
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(visits_router, prefix=api_prefix)
     app.include_router(products_router, prefix=api_prefix)
     app.include_router(uploads_router, prefix=api_prefix)
+    app.include_router(analytics_router, prefix=api_prefix)
 
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

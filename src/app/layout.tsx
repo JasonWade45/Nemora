@@ -14,6 +14,13 @@ const cairo = Cairo({
 export const metadata: Metadata = {
   title: "NEMORA — Pharma Field Force CRM",
   description: "نظام إدارة فرق المبيعات الميدانية",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "NEMORA",
+  },
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({

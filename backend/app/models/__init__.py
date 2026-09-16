@@ -15,6 +15,7 @@ from app.models.workplace import Workplace
 from app.models.product import Product
 from app.models.visit import Visit, VisitPurpose, VisitStatus, DoctorResponse
 from app.models.visit_product import VisitProduct
+from app.models.sale import Sale, SaleStatus
 from app.models.follow_up import FollowUp, FollowUpActionType, FollowUpStatus
 from app.models.notification import Notification
 from app.models.subscription import Subscription
@@ -44,6 +45,8 @@ __all__ = [
     "VisitStatus",
     "DoctorResponse",
     "VisitProduct",
+    "Sale",
+    "SaleStatus",
     "FollowUp",
     "FollowUpActionType",
     "FollowUpStatus",

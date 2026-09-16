@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_roles
 from app.core.rbac import Role
 from app.core.plans import check_limit
+from app.core.focus import get_focus_areas
 from app.models.doctor import Doctor
 from app.models.doctor_assignment import DoctorAssignment
 from app.models.doctor_workplace import DoctorWorkplace
@@ -116,6 +117,13 @@ def list_doctors(
     current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
 ) -> DoctorListResponse:
     query = db.query(Doctor).filter(Doctor.organization_id == current_user.organization_id)
+
+    # Apply organization focus areas filter (Admin + Manager only)
+    # Medical rep is already filtered by their own specialties below
+    if current_user.role.value in (Role.ADMIN.value, Role.MANAGER.value):
+        focus_areas = get_focus_areas(db, current_user.organization_id)
+        if focus_areas:
+            query = query.filter(Doctor.specialty.in_(focus_areas))
 
     if search:
         term = f"%{search.strip()}%"

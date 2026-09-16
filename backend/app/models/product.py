@@ -36,6 +36,8 @@ class Product(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     dosage_info: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    unit_price: Mapped[Optional[float]] = mapped_column(nullable=True)
+    unit_cost: Mapped[Optional[float]] = mapped_column(nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(

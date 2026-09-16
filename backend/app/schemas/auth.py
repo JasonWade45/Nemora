@@ -39,6 +39,7 @@ class SignupRequest(BaseModel):
     admin_full_name: str = Field(min_length=2, max_length=255)
     admin_email: str = Field(min_length=3, max_length=320)
     admin_password: str = Field(min_length=8)
+    focus_areas: list[str] = Field(default_factory=list)
 
 
 class SignupResponse(BaseModel):

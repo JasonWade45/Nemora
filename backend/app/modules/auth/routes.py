@@ -48,17 +48,17 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 @router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
 def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> SignupResponse:
-    # Check if email already exists
     existing_email = db.query(User).filter(User.email == payload.admin_email).first()
     if existing_email:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    # Check if slug exists
     existing_slug = db.query(Organization).filter(Organization.slug == payload.organization_slug).first()
     if existing_slug:
         raise HTTPException(status_code=409, detail="Organization slug already taken")
 
-    # Create organization
+    # Clean + dedupe focus areas
+    focus_areas = sorted({s.strip() for s in (payload.focus_areas or []) if s and s.strip()})
+
     org = Organization(
         name=payload.organization_name.strip(),
         slug=payload.organization_slug.strip().lower(),
@@ -71,12 +71,14 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> SignupRespo
                 "visit_reminder": True,
                 "daily_report": True,
             },
+            "plan": "basic",
+            "status": "active",
+            "focus_areas": focus_areas,
         }),
     )
     db.add(org)
     db.flush()
 
-    # Create admin user
     admin = User(
         organization_id=org.id,
         email=payload.admin_email.strip().lower(),
@@ -97,7 +99,7 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> SignupRespo
         action="ORGANIZATION_SIGNUP",
         entity="Organization",
         entity_id=org.id,
-        metadata={"slug": org.slug, "email": admin.email},
+        metadata={"slug": org.slug, "email": admin.email, "focus_areas": focus_areas},
     )
 
     db.commit()

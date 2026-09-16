@@ -17,6 +17,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '/admin', labelAr: 'لوحة التحكم', labelEn: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/my-reps', labelAr: 'مندوبيني', labelEn: 'My Reps', icon: UserPlus },
   { href: '/admin/visits', labelAr: 'زيارات الفريق', labelEn: 'Team Visits', icon: MapPin },
+  { href: '/admin/sales', labelAr: 'المبيعات', labelEn: 'Sales', icon: Package },
   { href: '/admin/analytics', labelAr: 'التحليلات', labelEn: 'Analytics', icon: Target },
   { href: '/admin/doctors', labelAr: 'الأطباء', labelEn: 'Doctors', icon: Users },
   { href: '/admin/products', labelAr: 'المنتجات', labelEn: 'Products', icon: Package },
@@ -27,6 +28,7 @@ const MANAGER_NAV_ITEMS = [
   { href: '/manager', labelAr: 'لوحة التحكم', labelEn: 'Dashboard', icon: LayoutDashboard },
   { href: '/manager/team', labelAr: 'الفريق كامل', labelEn: 'Full Team', icon: Users },
   { href: '/manager/visits', labelAr: 'كل الزيارات', labelEn: 'All Visits', icon: MapPin },
+  { href: '/manager/sales', labelAr: 'المبيعات', labelEn: 'Sales', icon: Package },
   { href: '/manager/analytics', labelAr: 'التحليلات', labelEn: 'Analytics', icon: Target },
   { href: '/manager/products', labelAr: 'المنتجات', labelEn: 'Products', icon: Package },
 ];

@@ -663,3 +663,81 @@ export async function getAnalyticsDetails(params: {
   if (params.product_id) q.set("product_id", params.product_id);
   return apiFetch(`/api/analytics/details?${q.toString()}`);
 }
+
+// ============ Signup ============
+
+export type SignupPayload = {
+  organization_name: string;
+  organization_slug: string;
+  admin_full_name: string;
+  admin_email: string;
+  admin_password: string;
+};
+
+export type SignupResponse = {
+  organization_id: string;
+  organization_name: string;
+  admin_user_id: string;
+  admin_email: string;
+  access_token: string;
+  expires_in_minutes: number;
+};
+
+export async function signup(payload: SignupPayload): Promise<SignupResponse> {
+  return apiFetch<SignupResponse>("/api/auth/signup", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ============ Super Admin ============
+
+export type OrganizationSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  users_count: number;
+  doctors_count: number;
+  visits_count: number;
+  created_at: string;
+};
+
+export type OrganizationDetail = {
+  id: string;
+  name: string;
+  slug: string;
+  settings: Record<string, any>;
+  users: Array<{
+    id: string;
+    email: string;
+    full_name: string;
+    role: string;
+    is_active: boolean;
+    is_super_admin: boolean;
+    created_at: string;
+  }>;
+  created_at: string;
+};
+
+export type PlatformStats = {
+  organizations: number;
+  users: number;
+  doctors: number;
+  visits: number;
+};
+
+export async function getSuperStats(): Promise<PlatformStats> {
+  return apiFetch<PlatformStats>("/api/super/stats");
+}
+
+export async function listOrganizations(): Promise<OrganizationSummary[]> {
+  return apiFetch<OrganizationSummary[]>("/api/super/organizations");
+}
+
+export async function getOrganization(id: string): Promise<OrganizationDetail> {
+  return apiFetch<OrganizationDetail>(`/api/super/organizations/${id}`);
+}
+
+export async function deleteOrganization(id: string): Promise<void> {
+  return apiFetch(`/api/super/organizations/${id}`, { method: "DELETE" });
+}

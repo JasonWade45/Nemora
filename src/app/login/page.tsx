@@ -178,6 +178,12 @@ export default function LoginPage() {
             <div className="text-[11px] text-sky-700">Password: NemoraAdmin2025</div>
           </div>
 
+          <div className="mt-6 text-center text-sm text-slate-600">
+            ما عندكش حساب؟{" "}
+            <Link href="/signup" className="text-sky-600 hover:text-sky-800 font-medium">
+              سجّل شركتك الآن
+            </Link>
+          </div>
           <div className="mt-6 text-center">
             <Link href="/" className="text-xs text-slate-500 hover:text-slate-700">
               ← Back to home

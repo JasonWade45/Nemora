@@ -1,6 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from app.core.config import get_settings
 from app.middleware.rate_limit import SimpleRateLimitMiddleware
@@ -20,9 +22,8 @@ from app.modules.super.routes import router as super_router
 
 settings = get_settings()
 
-# ============ CORS Origins ============
-# Always include production + localhost. Merge with whatever settings gives.
-PRODUCTION_ORIGINS = [
+# Allowed origins — hardcoded to guarantee they're always present
+ALLOWED_ORIGINS = [
     "https://nemora-git-main-nemora2.vercel.app",
     "https://nemora-five.vercel.app",
     "https://nemora.fastapicloud.dev",
@@ -30,49 +31,55 @@ PRODUCTION_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
-def _build_cors_origins() -> list[str]:
-    origins: list[str] = []
-    try:
-        from_settings = settings.cors_origins
-        if isinstance(from_settings, list):
-            origins.extend([str(o) for o in from_settings if o])
-        elif isinstance(from_settings, str):
-            # Try parsing as JSON list
-            import json
+
+class ForceCORSMiddleware(BaseHTTPMiddleware):
+    """Guarantees CORS headers on EVERY response, including errors and OPTIONS."""
+
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin", "")
+        allowed = origin in ALLOWED_ORIGINS
+
+        # Handle preflight immediately
+        if request.method == "OPTIONS":
+            response = Response(status_code=204)
+        else:
             try:
-                parsed = json.loads(from_settings)
-                if isinstance(parsed, list):
-                    origins.extend([str(o) for o in parsed if o])
-                else:
-                    origins.append(from_settings)
+                response = await call_next(request)
             except Exception:
-                origins.append(from_settings)
-    except Exception:
-        pass
+                response = Response(status_code=500)
 
-    # Merge with production list, dedupe
-    for o in PRODUCTION_ORIGINS:
-        if o not in origins:
-            origins.append(o)
+        if allowed and origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = (
+                "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            )
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Max-Age"] = "3600"
+            response.headers["Vary"] = "Origin"
 
-    return origins
-
-
-CORS_ORIGINS = _build_cors_origins()
+        return response
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
+    # Order matters! The LAST added middleware is the OUTERMOST (runs first).
+    # 1. Rate limit (innermost)
+    app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=600)
+
+    # 2. FastAPI's CORS (middle layer)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=CORS_ORIGINS,
+        allow_origins=ALLOWED_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["*"],
     )
-    app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=120)
+
+    # 3. Force CORS — OUTERMOST, runs first, guarantees headers
+    app.add_middleware(ForceCORSMiddleware)
 
     @app.get("/health")
     def health() -> dict[str, str]:

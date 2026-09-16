@@ -1,4 +1,4 @@
-const API_URL = "https://nemora.fastapicloud.dev";
+API_URL = "https://nemora.fastapicloud.dev";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -740,4 +740,129 @@ export async function getOrganization(id: string): Promise<OrganizationDetail> {
 
 export async function deleteOrganization(id: string): Promise<void> {
   return apiFetch(`/api/super/organizations/${id}`, { method: "DELETE" });
+}
+
+// ============ Super Admin — Extended ============
+
+export type OrgStatus = "active" | "suspended";
+export type OrgPlan = "basic" | "professional" | "enterprise";
+
+export async function updateOrganization(
+  id: string,
+  payload: Partial<{
+    name: string;
+    slug: string;
+    status: OrgStatus;
+    plan: OrgPlan;
+    settings: Record<string, any>;
+  }>
+): Promise<OrganizationSummary> {
+  return apiFetch<OrganizationSummary>(`/api/super/organizations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function suspendOrganization(id: string): Promise<OrganizationSummary> {
+  return updateOrganization(id, { status: "suspended" });
+}
+
+export async function activateOrganization(id: string): Promise<OrganizationSummary> {
+  return updateOrganization(id, { status: "active" });
+}
+
+// Users management
+export async function superUpdateUser(
+  userId: string,
+  payload: Partial<{
+    full_name: string;
+    email: string;
+    role: string;
+    is_active: boolean;
+    is_super_admin: boolean;
+  }>
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/super/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resetUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/super/users/${userId}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ new_password: newPassword }),
+  });
+}
+
+export async function impersonateUser(userId: string): Promise<{
+  access_token: string;
+  user_email: string;
+  user_name: string;
+  user_role: string;
+}> {
+  return apiFetch(`/api/super/users/${userId}/impersonate`, { method: "POST" });
+}
+
+export async function superDeleteUser(userId: string): Promise<void> {
+  return apiFetch(`/api/super/users/${userId}`, { method: "DELETE" });
+}
+
+// Audit Logs
+export type AuditLogEntry = {
+  id: string;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  actor_name: string;
+  actor_email: string | null;
+  metadata: string | null;
+  created_at: string | null;
+};
+
+export async function listAuditLogs(params?: {
+  limit?: number;
+  action_filter?: string;
+}): Promise<AuditLogEntry[]> {
+  const q = new URLSearchParams();
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.action_filter) q.set("action_filter", params.action_filter);
+  const suffix = q.toString() ? "?" + q.toString() : "";
+  return apiFetch<AuditLogEntry[]>(`/api/super/audit-logs${suffix}`);
+}
+
+// Broadcast
+export async function broadcastNotification(payload: {
+  title: string;
+  message: string;
+  type?: string;
+}): Promise<{ ok: boolean; sent_to: number }> {
+  return apiFetch(`/api/super/broadcast`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// Platform Analytics
+export type PlatformAnalytics = {
+  new_orgs_30d: number;
+  new_orgs_7d: number;
+  new_users_30d: number;
+  visits_30d: number;
+  top_organizations: Array<{ id: string; name: string; slug: string; visits: number }>;
+};
+
+export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
+  return apiFetch<PlatformAnalytics>("/api/super/analytics/overview");
+}
+
+// System Health
+export async function getSystemHealth(): Promise<{
+  database: string;
+  timestamp: string;
+}> {
+  return apiFetch("/api/super/system/health");
 }

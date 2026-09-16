@@ -1,4 +1,4 @@
-const API_URL = "https://regulate-shabby-repossess.ngrok-free.dev";
+const API_URL = "https://nemora.fastapicloud.dev";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

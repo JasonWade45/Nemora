@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,6 @@ from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
 from app.models.notification import Notification
 from app.models.organization import Organization
-from app.models.notification import Notification
 from app.models.user import User, UserRole
 from app.models.visit import Visit
 
@@ -37,8 +36,8 @@ class OrganizationSummary(BaseModel):
 class OrganizationUpdate(BaseModel):
     name: str | None = None
     slug: str | None = None
-    status: str | None = None  # active | suspended
-    plan: str | None = None  # basic | professional | enterprise
+    status: str | None = None
+    plan: str | None = None
     settings: dict | None = None
 
 
@@ -49,6 +48,8 @@ class OrganizationDetail(BaseModel):
     status: str
     plan: str
     settings: dict
+    limits: dict = {}
+    usage: dict = {}
     users: list[dict]
     created_at: datetime
 
@@ -69,6 +70,22 @@ class BroadcastRequest(BaseModel):
     title: str = Field(min_length=2, max_length=255)
     message: str = Field(min_length=2, max_length=2000)
     type: str = "SYSTEM"
+
+    @field_validator("title")
+    @classmethod
+    def _validate_title(cls, v: str) -> str:
+        v = (v or "").strip()
+        if len(v) < 2:
+            raise ValueError("العنوان يجب أن يكون حرفين على الأقل")
+        return v
+
+    @field_validator("message")
+    @classmethod
+    def _validate_message(cls, v: str) -> str:
+        v = (v or "").strip()
+        if len(v) < 2:
+            raise ValueError("الرسالة يجب أن تكون حرفين على الأقل")
+        return v
 
 
 # ============ Helpers ============
@@ -122,8 +139,6 @@ def platform_stats(
     total_doctors = db.query(func.count(Doctor.id)).scalar() or 0
     total_visits = db.query(func.count(Visit.id)).scalar() or 0
 
-    # Active in last 7 days
-    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     active_users = db.query(func.count(User.id)).filter(
         User.is_active == True,
     ).scalar() or 0
@@ -173,6 +188,10 @@ def get_organization(
     users = db.query(User).filter(User.organization_id == org.id).order_by(User.created_at.asc()).all()
     settings = _load_settings(org)
 
+    from app.core.plans import get_plan
+    plan_data = get_plan(settings.get("plan", "basic"))
+    doctors_count = db.query(func.count(Doctor.id)).filter(Doctor.organization_id == org.id).scalar() or 0
+
     return OrganizationDetail(
         id=org.id,
         name=org.name,
@@ -180,6 +199,15 @@ def get_organization(
         status=settings.get("status", "active"),
         plan=settings.get("plan", "basic"),
         settings=settings,
+        limits={
+            "max_users": plan_data["max_users"],
+            "max_doctors": plan_data["max_doctors"],
+            "max_visits_per_month": plan_data["max_visits_per_month"],
+        },
+        usage={
+            "users": len(users),
+            "doctors": doctors_count,
+        },
         users=[
             {
                 "id": u.id,
@@ -246,7 +274,6 @@ def delete_organization(
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    # Safety: prevent deleting your own org
     if org.id == current_user.organization_id:
         raise HTTPException(status_code=400, detail="Cannot delete your own organization")
 
@@ -281,7 +308,6 @@ def update_user(
     if payload.is_active is not None:
         user.is_active = payload.is_active
     if payload.is_super_admin is not None:
-        # Don't let super admin remove their own super status
         if user.id == current_user.id and not payload.is_super_admin:
             raise HTTPException(status_code=400, detail="Cannot remove your own super admin status")
         user.is_super_admin = payload.is_super_admin
@@ -369,7 +395,6 @@ def list_audit_logs(
 
     logs = q.order_by(AuditLog.created_at.desc()).limit(limit).all()
 
-    # Enrich with user info
     user_ids = list({log.actor_user_id for log in logs if log.actor_user_id})
     users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
 
@@ -442,7 +467,6 @@ def platform_analytics(
         Visit.created_at >= thirty_days_ago
     ).scalar() or 0
 
-    # Top orgs by visits
     top_orgs_query = (
         db.query(
             Organization.id,
@@ -478,7 +502,6 @@ def system_health(
     db: Session = Depends(get_db),
     current_user: User = Depends(_require_super_admin),
 ):
-    # Simple DB check
     try:
         db.execute(func.now().select() if False else "SELECT 1")
         db_ok = True

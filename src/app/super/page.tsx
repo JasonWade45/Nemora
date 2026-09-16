@@ -627,16 +627,55 @@ function BroadcastTab() {
   const [result, setResult] = useState<string | null>(null);
 
   async function send() {
-    if (!title.trim() || !message.trim()) return;
+    const trimmedTitle = title.trim();
+    const trimmedMessage = message.trim();
+
+    // Frontend validation (Arabic messages)
+    if (trimmedTitle.length === 0) {
+      setResult("❌ العنوان مطلوب");
+      return;
+    }
+    if (trimmedTitle.length < 2) {
+      setResult("❌ العنوان يجب أن يكون حرفين على الأقل");
+      return;
+    }
+    if (trimmedMessage.length === 0) {
+      setResult("❌ الرسالة مطلوبة");
+      return;
+    }
+    if (trimmedMessage.length < 2) {
+      setResult("❌ الرسالة يجب أن تكون حرفين على الأقل");
+      return;
+    }
+
     setSending(true);
     setResult(null);
     try {
-      const res = await broadcastNotification({ title: title.trim(), message: message.trim(), type });
+      const res = await broadcastNotification({
+        title: trimmedTitle,
+        message: trimmedMessage,
+        type,
+      });
       setResult(`✅ تم الإرسال إلى ${res.sent_to} مستخدم`);
       setTitle("");
       setMessage("");
-    } catch (e: any) {
-      setResult(`❌ فشل: ${e.message}`);
+    } catch (err: any) {
+      // Parse FastAPI validation errors and show Arabic message
+      let msg = "فشل الإرسال. حاول مرة أخرى.";
+      try {
+        const raw = err?.message || "";
+        const parsed = JSON.parse(raw);
+        if (parsed?.detail) {
+          if (typeof parsed.detail === "string") {
+            msg = parsed.detail;
+          } else if (Array.isArray(parsed.detail) && parsed.detail[0]?.msg) {
+            msg = parsed.detail[0].msg;
+          }
+        }
+      } catch {
+        // not JSON — keep default
+      }
+      setResult(`❌ ${msg}`);
     } finally {
       setSending(false);
     }

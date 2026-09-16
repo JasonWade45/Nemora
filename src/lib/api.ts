@@ -1,4 +1,4 @@
-API_URL = "https://nemora.fastapicloud.dev";
+const API_URL = "https://nemora.fastapicloud.dev";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

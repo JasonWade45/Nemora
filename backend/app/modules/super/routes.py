@@ -13,6 +13,7 @@ from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
 from app.models.notification import Notification
 from app.models.organization import Organization
+from app.models.notification import Notification
 from app.models.user import User, UserRole
 from app.models.visit import Visit
 

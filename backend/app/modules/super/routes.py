@@ -11,7 +11,7 @@ from app.api.deps import get_current_user, get_db
 from app.core.security import create_access_token, hash_password
 from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
-from app.models.notification import Notification
+from app.models.notification import Notification, NotificationType
 from app.models.organization import Organization
 from app.models.user import User, UserRole
 from app.models.visit import Visit
@@ -421,6 +421,12 @@ def broadcast_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(_require_super_admin),
 ):
+    # Parse notification type safely
+    try:
+        ntype = NotificationType(payload.type)
+    except ValueError:
+        ntype = NotificationType.SYSTEM
+
     users = db.query(User).filter(User.is_active == True).all()
 
     notifications = [
@@ -428,7 +434,7 @@ def broadcast_notification(
             user_id=u.id,
             title=payload.title,
             message=payload.message,
-            type=payload.type,
+            type=ntype,
             is_read=False,
         )
         for u in users

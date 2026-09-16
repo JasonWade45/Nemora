@@ -22,7 +22,6 @@ from app.modules.super.routes import router as super_router
 
 settings = get_settings()
 
-# Allowed origins — hardcoded to guarantee they're always present
 ALLOWED_ORIGINS = [
     "https://nemora-git-main-nemora2.vercel.app",
     "https://nemora-five.vercel.app",
@@ -33,13 +32,12 @@ ALLOWED_ORIGINS = [
 
 
 class ForceCORSMiddleware(BaseHTTPMiddleware):
-    """Guarantees CORS headers on EVERY response, including errors and OPTIONS."""
+    """Guarantees CORS headers on EVERY response."""
 
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
         allowed = origin in ALLOWED_ORIGINS
 
-        # Handle preflight immediately
         if request.method == "OPTIONS":
             response = Response(status_code=204)
         else:
@@ -64,11 +62,7 @@ class ForceCORSMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
-    # Order matters! The LAST added middleware is the OUTERMOST (runs first).
-    # 1. Rate limit (innermost)
     app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=600)
-
-    # 2. FastAPI's CORS (middle layer)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
@@ -77,8 +71,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         expose_headers=["*"],
     )
-
-    # 3. Force CORS — OUTERMOST, runs first, guarantees headers
     app.add_middleware(ForceCORSMiddleware)
 
     @app.get("/health")

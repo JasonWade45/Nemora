@@ -879,3 +879,126 @@ export async function getSystemHealth(): Promise<{
 }> {
   return apiFetch("/api/super/system/health");
 }
+
+// ============ Sales ============
+
+export type SaleStatus = "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED";
+
+export type Sale = {
+  id: string;
+  organization_id: string;
+  rep_id: string;
+  rep_name?: string | null;
+  doctor_id: string;
+  doctor_name?: string | null;
+  doctor_specialty?: string | null;
+  doctor_area?: string | null;
+  product_id: string;
+  product_name?: string | null;
+  product_category?: string | null;
+  visit_id?: string | null;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
+  total_price: number;
+  total_cost: number;
+  profit: number;
+  status: SaleStatus;
+  notes?: string | null;
+  sold_at: string;
+  created_at: string;
+};
+
+export type SaleListResponse = {
+  items: Sale[];
+  total: number;
+  total_revenue: number;
+  total_cost: number;
+  total_profit: number;
+};
+
+export type SalesAnalytics = {
+  total_revenue: number;
+  total_cost: number;
+  total_profit: number;
+  total_sales: number;
+  avg_sale_value: number;
+  top_products: Array<{ id: string; name: string; category?: string | null; quantity: number; revenue: number }>;
+  top_reps: Array<{ id: string; name: string; sales_count: number; revenue: number }>;
+  top_doctors: Array<{ id: string; name: string; specialty?: string | null; area?: string | null; sales_count: number; revenue: number }>;
+  revenue_trend: Array<{ date: string; revenue: number; profit: number; count: number }>;
+};
+
+export async function getSales(params?: {
+  days?: number;
+  doctor_id?: string;
+  product_id?: string;
+  rep_id?: string;
+  status?: string;
+}): Promise<SaleListResponse> {
+  const q = new URLSearchParams();
+  if (params?.days) q.set("days", String(params.days));
+  if (params?.doctor_id) q.set("doctor_id", params.doctor_id);
+  if (params?.product_id) q.set("product_id", params.product_id);
+  if (params?.rep_id) q.set("rep_id", params.rep_id);
+  if (params?.status) q.set("status", params.status);
+  const suffix = q.toString() ? "?" + q.toString() : "";
+  return apiFetch(`/api/sales${suffix}`);
+}
+
+export async function getSale(id: string): Promise<Sale> {
+  return apiFetch(`/api/sales/${id}`);
+}
+
+export async function createSale(payload: {
+  doctor_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price?: number | null;
+  unit_cost?: number | null;
+  visit_id?: string | null;
+  notes?: string | null;
+  status?: SaleStatus;
+}): Promise<Sale> {
+  return apiFetch("/api/sales", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateSale(
+  id: string,
+  payload: Partial<{
+    quantity: number;
+    unit_price: number;
+    unit_cost: number;
+    status: SaleStatus;
+    notes: string;
+  }>
+): Promise<Sale> {
+  return apiFetch(`/api/sales/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteSale(id: string): Promise<void> {
+  return apiFetch(`/api/sales/${id}`, { method: "DELETE" });
+}
+
+export async function getSalesAnalytics(params?: {
+  days?: number;
+  specialty?: string;
+  area?: string;
+  rep_id?: string;
+  product_id?: string;
+}): Promise<SalesAnalytics> {
+  const q = new URLSearchParams();
+  if (params?.days) q.set("days", String(params.days));
+  if (params?.specialty) q.set("specialty", params.specialty);
+  if (params?.area) q.set("area", params.area);
+  if (params?.rep_id) q.set("rep_id", params.rep_id);
+  if (params?.product_id) q.set("product_id", params.product_id);
+  const suffix = q.toString() ? "?" + q.toString() : "";
+  return apiFetch(`/api/sales/analytics/overview${suffix}`);
+}

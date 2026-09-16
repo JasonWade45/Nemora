@@ -10,11 +10,14 @@ import { clearToken, getToken, apiFetch } from "@/lib/api";
 const PRODUCTS_ICON =
   "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z";
 
+const SALES_ICON =
+  "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 8m0 0h14M7 21h10";
+
 const TABS = [
   { href: "/rep",            label: "لوحتي",   icon: icons.dashboard },
   { href: "/rep/nearby",     label: "قريبون",  icon: icons.pin },
   { href: "/rep/my-doctors", label: "أطبائي",  icon: icons.doctors },
-  { href: "/rep/products",   label: "منتجاتي", icon: PRODUCTS_ICON },
+  { href: "/rep/sales",      label: "مبيعاتي", icon: SALES_ICON },
   { href: "/rep/visits",     label: "زياراتي", icon: icons.visits },
   { href: "/rep/profile",    label: "حسابي",   icon: icons.users },
 ];

@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.rbac import Role
+from app.core.plans import check_limit
 from app.models.doctor import Doctor
 from app.models.doctor_assignment import DoctorAssignment
 from app.models.doctor_workplace import DoctorWorkplace
 from app.models.enums import DoctorStatus, PriorityLevel
+from app.models.organization import Organization
 from app.models.user import User
 from app.models.workplace import Workplace
 from app.modules.audit.service import create_audit_log
@@ -18,7 +20,6 @@ from app.schemas.workplace import WorkplaceResponse
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
-# Fields a MEDICAL_REP is allowed to update
 REP_EDITABLE_FIELDS = {"phone", "address", "notes", "working_hours", "city"}
 
 
@@ -60,6 +61,17 @@ def _safe_load_specialties(raw: str | None) -> list[str]:
     except (json.JSONDecodeError, TypeError):
         pass
     return []
+
+
+def _get_plan_key(db: Session, org_id: str) -> str:
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        return "basic"
+    try:
+        settings = json.loads(org.settings or "{}")
+        return settings.get("plan", "basic")
+    except Exception:
+        return "basic"
 
 
 def _doctor_to_response(doctor: Doctor) -> DoctorResponse:
@@ -131,9 +143,6 @@ def list_doctors(
     if priority_filter:
         query = query.filter(Doctor.priority == priority_filter)
 
-    # Medical reps:
-    # - If they have assigned specialties, filter doctors by those specialties.
-    # - Otherwise fall back to explicit assignments (if any).
     if current_user.role.value == Role.MEDICAL_REP.value:
         rep_specialties = _safe_load_specialties(current_user.specialties_json)
         if rep_specialties:
@@ -172,6 +181,17 @@ def create_doctor(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
 ) -> DoctorResponse:
+    # Plan limit check
+    plan_key = _get_plan_key(db, current_user.organization_id)
+    current_doctors = db.query(Doctor).filter(
+        Doctor.organization_id == current_user.organization_id
+    ).count()
+    if not check_limit(plan_key, "doctors", current_doctors):
+        raise HTTPException(
+            status_code=402,
+            detail=f"وصلت للحد الأقصى للأطباء في خطة {plan_key}. رقّي الخطة للمزيد.",
+        )
+
     # Medical rep can only add doctors within their own specialties
     if current_user.role.value == Role.MEDICAL_REP.value:
         rep_specialties = _safe_load_specialties(current_user.specialties_json)
@@ -269,7 +289,6 @@ def update_doctor(
 
     updates = payload.model_dump(exclude_none=True)
 
-    # Medical reps can only update a restricted set of fields
     if current_user.role.value == Role.MEDICAL_REP.value:
         forbidden = set(updates.keys()) - REP_EDITABLE_FIELDS
         if forbidden:
@@ -363,7 +382,6 @@ def list_areas(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
 ):
-    """List distinct areas with counts for this organization."""
     from sqlalchemy import func as sqlfunc
     rows = db.query(
         Doctor.area,

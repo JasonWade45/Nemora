@@ -1,13 +1,14 @@
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
 from app.core.rbac import Role
+from app.core.plans import check_limit
 from app.core.security import hash_password
 from app.core.visibility import get_visible_user_ids
+from app.models.organization import Organization
 from app.models.user import User, UserRole
 from app.modules.audit.service import create_audit_log
 from app.schemas.user import (
@@ -30,6 +31,17 @@ def _safe_load_specialties(raw: str | None) -> list[str]:
     except Exception:
         pass
     return []
+
+
+def _get_plan_key(db: Session, org_id: str) -> str:
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        return "basic"
+    try:
+        settings = json.loads(org.settings or "{}")
+        return settings.get("plan", "basic")
+    except Exception:
+        return "basic"
 
 
 def _user_to_response(db: Session, user: User) -> UserResponse:
@@ -87,7 +99,6 @@ def list_my_reps(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER)),
 ):
-    """Returns reps under this admin, or all reps (for manager)."""
     q = db.query(User).filter(
         User.organization_id == current_user.organization_id,
         User.role == UserRole.MEDICAL_REP,
@@ -104,6 +115,17 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER)),
 ):
+    # Plan limit check
+    plan_key = _get_plan_key(db, current_user.organization_id)
+    current_users = db.query(User).filter(
+        User.organization_id == current_user.organization_id
+    ).count()
+    if not check_limit(plan_key, "users", current_users):
+        raise HTTPException(
+            status_code=402,
+            detail=f"وصلت للحد الأقصى للمستخدمين في خطة {plan_key}. رقّي الخطة للمزيد.",
+        )
+
     # Only manager can create admins/managers
     if payload.role in (UserRole.ADMIN, UserRole.MANAGER):
         if current_user.role != UserRole.MANAGER:
@@ -118,7 +140,6 @@ def create_user(
     else:
         supervisor_id = payload.supervisor_id
 
-    # Validate supervisor
     if supervisor_id:
         sup = db.query(User).filter(
             User.id == supervisor_id,
@@ -199,7 +220,6 @@ def update_user(
 
     updates = payload.model_dump(exclude_unset=True)
 
-    # Only manager can change roles
     if "role" in updates and current_user.role != UserRole.MANAGER:
         raise HTTPException(status_code=403, detail="Only managers can change roles")
 

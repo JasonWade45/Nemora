@@ -706,11 +706,23 @@ export type OrganizationDetail = {
   id: string;
   name: string;
   slug: string;
+  status: string;
+  plan: string;
   settings: Record<string, any>;
+  limits: {
+    max_users: number;
+    max_doctors: number;
+    max_visits_per_month: number;
+  };
+  usage: {
+    users: number;
+    doctors: number;
+  };
   users: Array<{
     id: string;
     email: string;
     full_name: string;
+    phone?: string | null;
     role: string;
     is_active: boolean;
     is_super_admin: boolean;

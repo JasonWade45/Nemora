@@ -21,6 +21,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "NEMORA",
   },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
   themeColor: "#0f172a",
 };
 
@@ -34,9 +38,9 @@ export default function RootLayout({
       <body className={`${cairo.variable} antialiased`}>
         <ThemeProvider>
           <LanguageProvider>
-  <PWARegister />
-  {children}
-</LanguageProvider>
+            <PWARegister />
+            {children}
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

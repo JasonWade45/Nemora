@@ -465,6 +465,8 @@ export type Product = {
   description?: string | null;
   dosage_info?: string | null;
   image_url?: string | null;
+  unit_price?: number | null;
+  unit_cost?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

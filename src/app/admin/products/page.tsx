@@ -19,9 +19,15 @@ function productInitial(name: string): string {
   return n.slice(0, 2).toUpperCase();
 }
 
+function fmtMoney(v: number | null | undefined) {
+  if (v == null || v === 0) return null;
+  return v.toLocaleString("ar-EG", { maximumFractionDigits: 0 }) + " ج";
+}
+
 function ProductCard({ p }: { p: Product }) {
   const [imgError, setImgError] = useState(false);
   const hasImage = !!p.image_url && !imgError;
+  const priceLabel = fmtMoney(p.unit_price);
 
   return (
     <div className="group rounded-2xl bg-white border border-slate-200 overflow-hidden hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/5 transition-all">
@@ -61,6 +67,11 @@ function ProductCard({ p }: { p: Product }) {
             {p.generic_name}
           </div>
         )}
+        {priceLabel && (
+          <div className="mt-2 text-sm font-bold text-teal-600 tabular-nums">
+            {priceLabel}
+          </div>
+        )}
         {p.owner_name && (
           <div className="text-[10px] text-slate-400 mt-1.5 truncate">
             بواسطة: {p.owner_name}
@@ -90,6 +101,8 @@ export default function AdminProductsPage() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [unitCost, setUnitCost] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [visibleToAll, setVisibleToAll] = useState(false);
   const [assignedTo, setAssignedTo] = useState("");
@@ -189,6 +202,8 @@ export default function AdminProductsPage() {
         category: category.trim() || null,
         description: description.trim() || null,
         image_url: imageUrl.trim() || null,
+        unit_price: unitPrice ? parseFloat(unitPrice) : null,
+        unit_cost: unitCost ? parseFloat(unitCost) : null,
         visible_to_all: visibleToAll,
         assigned_to_user_id: assignedTo || null,
       });
@@ -196,6 +211,8 @@ export default function AdminProductsPage() {
       setGenericName("");
       setCategory("");
       setDescription("");
+      setUnitPrice("");
+      setUnitCost("");
       clearImage();
       setVisibleToAll(false);
       setAssignedTo("");
@@ -360,6 +377,52 @@ export default function AdminProductsPage() {
               ))}
             </select>
           </div>
+
+          {/* Pricing */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1.5">
+                سعر البيع
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition tabular-nums"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1.5">
+                التكلفة
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition tabular-nums"
+              />
+            </div>
+          </div>
+
+          {unitPrice && unitCost && parseFloat(unitPrice) > 0 && (
+            <div className="rounded-lg bg-teal-50 border border-teal-100 px-3 py-2 text-xs">
+              <span className="text-teal-900">هامش الربح المتوقع: </span>
+              <span className="font-bold text-teal-700 tabular-nums">
+                {(
+                  ((parseFloat(unitPrice) - parseFloat(unitCost)) /
+                    parseFloat(unitPrice)) *
+                  100
+                ).toFixed(1)}
+                %
+              </span>
+            </div>
+          )}
 
           {/* Visibility options */}
           <div className="rounded-xl bg-indigo-50/50 border border-indigo-100 p-3 space-y-3">

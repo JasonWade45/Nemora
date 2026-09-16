@@ -17,9 +17,15 @@ function productInitial(name: string): string {
   return n.slice(0, 2).toUpperCase();
 }
 
+function fmtMoney(v: number | null | undefined) {
+  if (v == null || v === 0) return null;
+  return v.toLocaleString("ar-EG", { maximumFractionDigits: 0 }) + " ج";
+}
+
 function ProductCard({ p }: { p: Product }) {
   const [imgError, setImgError] = useState(false);
   const hasImage = !!p.image_url && !imgError;
+  const priceLabel = fmtMoney(p.unit_price);
 
   return (
     <div className="group rounded-2xl bg-white border border-slate-200 overflow-hidden hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/5 transition-all">
@@ -53,6 +59,11 @@ function ProductCard({ p }: { p: Product }) {
             {p.generic_name}
           </div>
         )}
+        {priceLabel && (
+          <div className="mt-2 text-sm font-bold text-teal-600 tabular-nums">
+            {priceLabel}
+          </div>
+        )}
         {p.description && (
           <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2 leading-relaxed">
             {p.description}
@@ -81,6 +92,8 @@ export default function RepProductsPage() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [unitCost, setUnitCost] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   async function load() {
@@ -112,7 +125,6 @@ export default function RepProductsPage() {
     return list;
   }, [products, activeCategory, search]);
 
-  // Available categories = union of predefined + existing products
   const availableCategories = useMemo(() => {
     const set = new Set<string>(PRODUCT_CATEGORIES);
     for (const p of products) {
@@ -135,12 +147,10 @@ export default function RepProductsPage() {
       return;
     }
 
-    // Preview immediately
     const reader = new FileReader();
     reader.onload = () => setImagePreview(reader.result as string);
     reader.readAsDataURL(file);
 
-    // Upload
     setUploading(true);
     try {
       const { url } = await uploadImage(file);
@@ -171,11 +181,15 @@ export default function RepProductsPage() {
         category: category.trim() || null,
         description: description.trim() || null,
         image_url: imageUrl.trim() || null,
+        unit_price: unitPrice ? parseFloat(unitPrice) : null,
+        unit_cost: unitCost ? parseFloat(unitCost) : null,
       });
       setName("");
       setGenericName("");
       setCategory("");
       setDescription("");
+      setUnitPrice("");
+      setUnitCost("");
       clearImage();
       setShowForm(false);
       await load();
@@ -192,7 +206,6 @@ export default function RepProductsPage() {
 
   return (
     <div className="space-y-4 pb-4">
-      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">منتجاتي</h1>
@@ -217,7 +230,6 @@ export default function RepProductsPage() {
         </button>
       </div>
 
-      {/* Form */}
       {showForm && (
         <div className="rounded-2xl bg-white border-2 border-indigo-100 p-4 space-y-3">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
@@ -233,7 +245,6 @@ export default function RepProductsPage() {
             </div>
           )}
 
-          {/* Image upload */}
           <div>
             <label className="block text-[11px] font-medium text-slate-600 mb-1.5">
               صورة المنتج
@@ -339,6 +350,50 @@ export default function RepProductsPage() {
             </select>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1.5">
+                سعر البيع
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition tabular-nums"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1.5">
+                التكلفة
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition tabular-nums"
+              />
+            </div>
+          </div>
+
+          {unitPrice && unitCost && parseFloat(unitPrice) > 0 && (
+            <div className="rounded-lg bg-teal-50 border border-teal-100 px-3 py-2 text-xs">
+              <span className="text-teal-900">هامش الربح المتوقع: </span>
+              <span className="font-bold text-teal-700 tabular-nums">
+                {(
+                  ((parseFloat(unitPrice) - parseFloat(unitCost)) / parseFloat(unitPrice)) *
+                  100
+                ).toFixed(1)}
+                %
+              </span>
+            </div>
+          )}
+
           <div>
             <label className="block text-[11px] font-medium text-slate-600 mb-1.5">
               الوصف
@@ -362,7 +417,6 @@ export default function RepProductsPage() {
         </div>
       )}
 
-      {/* Category dropdown */}
       {!loading && products.length > 0 && (
         <div className="relative z-30">
           <button
@@ -468,7 +522,6 @@ export default function RepProductsPage() {
         </div>
       )}
 
-      {/* Search */}
       <div className="relative">
         <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">
           <Icon d={icons.search} size={16} />
@@ -482,7 +535,6 @@ export default function RepProductsPage() {
         />
       </div>
 
-      {/* Grid */}
       {loading ? (
         <div className="grid grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (

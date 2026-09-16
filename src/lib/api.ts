@@ -672,6 +672,7 @@ export type SignupPayload = {
   admin_full_name: string;
   admin_email: string;
   admin_password: string;
+  focus_areas: string[];
 };
 
 export type SignupResponse = {

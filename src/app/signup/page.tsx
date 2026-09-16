@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signup } from "@/lib/api";
 
+const FOCUS_AREA_OPTIONS = [
+  "جلدية", "قلب", "أعصاب", "أطفال", "عظام", "باطنة",
+  "عيون", "أنف وأذن", "مسالك بولية", "نساء وتوليد",
+  "جهاز هضمي", "صدر وحساسية", "غدد صماء", "نفسية",
+  "أسنان", "تجميل", "مكملات غذائية", "فيتامينات",
+  "مضادات حيوية", "مسكنات",
+];
+
 export default function SignupPage() {
   const router = useRouter();
   const [orgName, setOrgName] = useState("");
@@ -12,6 +20,7 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +42,12 @@ export default function SignupPage() {
     }
   }
 
+  function toggleFocusArea(area: string) {
+    setFocusAreas((prev) =>
+      prev.includes(area) ? prev.filter((x) => x !== area) : [...prev, area]
+    );
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -45,6 +60,7 @@ export default function SignupPage() {
         admin_full_name: fullName.trim(),
         admin_email: email.trim().toLowerCase(),
         admin_password: password,
+        focus_areas: focusAreas,
       });
 
       if (typeof window !== "undefined" && data.access_token) {
@@ -154,6 +170,46 @@ export default function SignupPage() {
               </p>
             </div>
 
+            {/* Focus Areas */}
+            <div className="border-t border-slate-200 pt-4">
+              <div className="text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">
+                مجالات التركيز
+              </div>
+              <p className="text-[11px] text-slate-500 mb-3">
+                اختر التخصصات اللي شركتك مهتمة بيها. الفريق هيشوف بس الأطباء والمنتجات في المجالات دي.
+              </p>
+              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1">
+                {FOCUS_AREA_OPTIONS.map((area) => {
+                  const active = focusAreas.includes(area);
+                  return (
+                    <button
+                      key={area}
+                      type="button"
+                      onClick={() => toggleFocusArea(area)}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition border ${
+                        active
+                          ? "bg-sky-500 text-white border-sky-500"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-sky-300"
+                      }`}
+                    >
+                      {active && "✓ "}
+                      {area}
+                    </button>
+                  );
+                })}
+              </div>
+              {focusAreas.length === 0 ? (
+                <p className="text-[10px] text-amber-600 mt-2">
+                  ⚠ بدون اختيار — هتشوف كل التخصصات
+                </p>
+              ) : (
+                <p className="text-[10px] text-teal-600 mt-2 font-medium">
+                  ✓ اخترت {focusAreas.length} تخصص
+                </p>
+              )}
+            </div>
+
+            {/* Admin Account */}
             <div className="border-t border-slate-200 pt-4">
               <div className="text-[11px] font-semibold text-slate-500 mb-3 uppercase tracking-wide">
                 حساب المدير

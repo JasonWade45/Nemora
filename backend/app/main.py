@@ -1,8 +1,9 @@
+import traceback
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
 
 from app.core.config import get_settings
 from app.middleware.rate_limit import SimpleRateLimitMiddleware
@@ -31,38 +32,10 @@ ALLOWED_ORIGINS = [
 ]
 
 
-class ForceCORSMiddleware(BaseHTTPMiddleware):
-    """Guarantees CORS headers on EVERY response."""
-
-    async def dispatch(self, request: Request, call_next):
-        origin = request.headers.get("origin", "")
-        allowed = origin in ALLOWED_ORIGINS
-
-        if request.method == "OPTIONS":
-            response = Response(status_code=204)
-        else:
-            try:
-                response = await call_next(request)
-            except Exception:
-                response = Response(status_code=500)
-
-        if allowed and origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = (
-                "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-            )
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            response.headers["Access-Control-Max-Age"] = "3600"
-            response.headers["Vary"] = "Origin"
-
-        return response
-
-
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
-    app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=600)
+    # CORS middleware FIRST (outermost) so headers always apply
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
@@ -70,8 +43,33 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["*"],
+        max_age=3600,
     )
-    app.add_middleware(ForceCORSMiddleware)
+
+    # Rate limit AFTER CORS (innermost)
+    app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=600)
+
+    # Global exception handler — guarantees CORS headers on 500 errors
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        origin = request.headers.get("origin", "")
+        headers = {}
+        if origin in ALLOWED_ORIGINS:
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = "true"
+            headers["Vary"] = "Origin"
+
+        # Log the full traceback so we can debug
+        print("=" * 80)
+        print("UNHANDLED EXCEPTION:")
+        print(traceback.format_exc())
+        print("=" * 80)
+
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+            headers=headers,
+        )
 
     @app.get("/health")
     def health() -> dict[str, str]:

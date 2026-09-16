@@ -421,7 +421,6 @@ def broadcast_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(_require_super_admin),
 ):
-    # Parse notification type safely
     try:
         ntype = NotificationType(payload.type)
     except ValueError:
@@ -429,21 +428,23 @@ def broadcast_notification(
 
     users = db.query(User).filter(User.is_active == True).all()
 
-    notifications = [
-        Notification(
+    if not users:
+        return {"ok": True, "sent_to": 0}
+
+    # Individual add() calls so Python-side UUID default is applied
+    for u in users:
+        n = Notification(
             user_id=u.id,
             title=payload.title,
             message=payload.message,
             type=ntype,
             is_read=False,
         )
-        for u in users
-    ]
+        db.add(n)
 
-    db.bulk_save_objects(notifications)
     db.commit()
 
-    return {"ok": True, "sent_to": len(notifications)}
+    return {"ok": True, "sent_to": len(users)}
 
 
 # ============ Analytics ============

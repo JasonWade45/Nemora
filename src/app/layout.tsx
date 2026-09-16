@@ -3,7 +3,6 @@ import { Cairo } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LanguageProvider } from "@/lib/language-context";
-import { PWARegister } from "@/components/PWARegister";
 
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
@@ -37,10 +36,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body className={`${cairo.variable} antialiased`}>
         <ThemeProvider>
-          <LanguageProvider>
-            <PWARegister />
-            {children}
-          </LanguageProvider>
+          <LanguageProvider>{children}</LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

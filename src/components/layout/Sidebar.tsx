@@ -20,6 +20,7 @@ const ADMIN_NAV_ITEMS = [
   { href: '/admin/sales', labelAr: 'المبيعات', labelEn: 'Sales', icon: Package },
   { href: '/admin/sales-reports', labelAr: 'تقارير المبيعات', labelEn: 'Sales Reports', icon: Target },
   { href: '/admin/analytics', labelAr: 'التحليلات', labelEn: 'Analytics', icon: Target },
+  { href: '/admin/advanced-analytics', labelAr: 'تحليلات متقدمة', labelEn: 'Advanced', icon: Target },
   { href: '/admin/doctors', labelAr: 'الأطباء', labelEn: 'Doctors', icon: Users },
   { href: '/admin/products', labelAr: 'المنتجات', labelEn: 'Products', icon: Package },
   { href: '/admin/settings', labelAr: 'الإعدادات', labelEn: 'Settings', icon: Settings },

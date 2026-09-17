@@ -324,3 +324,93 @@ def analytics_details(
         return {"type": "reps", "items": items, "total": len(items)}
 
     return {"type": type, "items": [], "total": 0}
+
+
+@router.get("/advanced")
+def advanced_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER)),
+):
+    visible = get_visible_user_ids(db, current_user)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    visits = (
+        db.query(Visit)
+        .filter(Visit.organization_id == current_user.organization_id, Visit.rep_id.in_(visible), Visit.checked_in_at >= cutoff)
+        .all()
+    )
+
+    total = len(visits)
+    completed = [v for v in visits if v.status == VisitStatus.COMPLETED]
+    missed = [v for v in visits if v.status == VisitStatus.MISSED]
+    conversion_rate = len(completed) / total * 100 if total > 0 else 0
+
+    # Average duration
+    durations = [v.duration_minutes for v in completed if v.duration_minutes is not None]
+    avg_duration = sum(durations) / len(durations) if durations else 0
+
+    # Response breakdown
+    response_counts: dict[str, int] = {}
+    for v in completed:
+        resp = v.doctor_response.value if v.doctor_response else "لم يتم التقييم"
+        response_counts[resp] = response_counts.get(resp, 0) + 1
+
+    # Peak hours
+    hour_counts: dict[int, int] = {}
+    for v in visits:
+        if v.checked_in_at:
+            hour_counts[v.checked_in_at.hour] = hour_counts.get(v.checked_in_at.hour, 0) + 1
+
+    peak_hours = sorted(hour_counts.items(), key=lambda x: -x[1])[:5]
+
+    # Rep performance comparison
+    rep_stats: dict[str, dict] = {}
+    for v in visits:
+        rid = v.rep_id
+        if rid not in rep_stats:
+            rep_stats[rid] = {"id": rid, "total": 0, "completed": 0, "missed": 0, "avg_duration": 0, "durations": []}
+        rep_stats[rid]["total"] += 1
+        if v.status == VisitStatus.COMPLETED:
+            rep_stats[rid]["completed"] += 1
+            if v.duration_minutes:
+                rep_stats[rid]["durations"].append(v.duration_minutes)
+        elif v.status == VisitStatus.MISSED:
+            rep_stats[rid]["missed"] += 1
+
+    users_map = {u.id: u for u in db.query(User).filter(User.id.in_(list(rep_stats.keys()))).all()}
+
+    rep_comparison = []
+    for rid, s in rep_stats.items():
+        u = users_map.get(rid)
+        durs = s["durations"]
+        rep_comparison.append({
+            "id": rid,
+            "name": u.full_name if u else "—",
+            "total_visits": s["total"],
+            "completed": s["completed"],
+            "missed": s["missed"],
+            "conversion_rate": round(s["completed"] / s["total"] * 100, 1) if s["total"] > 0 else 0,
+            "avg_duration": round(sum(durs) / len(durs), 1) if durs else 0,
+        })
+
+    rep_comparison.sort(key=lambda x: -x["conversion_rate"])
+
+    # Day of week distribution
+    dow_counts: dict[str, int] = {d: 0 for d in ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"]}
+    dow_names = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+    for v in visits:
+        if v.checked_in_at:
+            dow_counts[dow_names[v.checked_in_at.weekday()]] += 1
+
+    return {
+        "total_visits": total,
+        "completed": len(completed),
+        "missed": len(missed),
+        "conversion_rate": round(conversion_rate, 1),
+        "avg_duration_minutes": round(avg_duration, 1),
+        "response_breakdown": response_counts,
+        "peak_hours": [{"hour": h, "count": c} for h, c in peak_hours],
+        "rep_comparison": rep_comparison,
+        "day_of_week_distribution": [{"day": d, "count": c} for d, c in dow_counts.items()],
+    }

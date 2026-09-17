@@ -70,8 +70,8 @@ class Sale(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    organization = relationship("Organization", back_populates="sales", viewonly=True)
-    rep = relationship("User", back_populates="sales", viewonly=True)
-    doctor = relationship("Doctor", back_populates="sales", viewonly=True)
+    organization = relationship("Organization", viewonly=True)
+    rep = relationship("User", viewonly=True)
+    doctor = relationship("Doctor", viewonly=True)
     product = relationship("Product", viewonly=True)
     visit = relationship("Visit", viewonly=True)

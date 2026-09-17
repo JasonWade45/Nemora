@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
+import { downloadCsv, printReport } from "@/lib/export";
 
 type PeriodReport = {
   period: string;
@@ -60,6 +61,58 @@ export default function SalesReportsPage() {
           شهري
         </button>
       </div>
+
+      {/* Export buttons */}
+      {report && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              if (!report) return;
+              const csvData = report.top_reps.map((r) => ({
+                "المندوب": r.name,
+                "المبيعات": r.count,
+                "الإيراد": r.revenue,
+                "التكلفة": r.cost,
+                "الربح": r.profit,
+              }));
+              downloadCsv(csvData, `sales-report-${period}-${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            تصدير CSV
+          </button>
+          <button
+            onClick={() => {
+              if (!report) return;
+              const html = `
+                <h1>تقرير المبيعات ${report.period === "أسبوعي" ? "الأسبوعي" : "الشهري"}</h1>
+                <div class="subtitle">${new Date(report.start_date).toLocaleDateString("ar-EG")} — ${new Date(report.end_date).toLocaleDateString("ar-EG")}</div>
+                <div class="stat-row">
+                  <div class="stat"><div class="num">${report.total_revenue.toLocaleString("ar-EG")}</div><div class="label">الإيراد</div></div>
+                  <div class="stat"><div class="num">${report.total_profit.toLocaleString("ar-EG")}</div><div class="label">الربح</div></div>
+                  <div class="stat"><div class="num">${report.total_sales}</div><div class="label">عدد المبيعات</div></div>
+                </div>
+                <table>
+                  <tr><th>المندوب</th><th>المبيعات</th><th>الإيراد</th><th>الربح</th></tr>
+                  ${report.top_reps.map((r) => `<tr><td>${r.name}</td><td>${r.count}</td><td>${r.revenue.toLocaleString("ar-EG")}</td><td>${r.profit.toLocaleString("ar-EG")}</td></tr>`).join("")}
+                </table>
+                ${report.top_products.length > 0 ? `
+                <h2 style="margin-top:30px;font-size:16px;">المنتجات</h2>
+                <table>
+                  <tr><th>المنتج</th><th>الكمية</th><th>الإيراد</th></tr>
+                  ${report.top_products.map((p) => `<tr><td>${p.name}</td><td>${p.quantity}</td><td>${p.revenue.toLocaleString("ar-EG")}</td></tr>`).join("")}
+                </table>` : ""}
+              `;
+              printReport(html, `تقرير المبيعات ${report.period}`);
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            طباعة
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">

@@ -40,6 +40,8 @@ ALLOWED_ORIGINS = [
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
+    app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=600)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
@@ -49,8 +51,6 @@ def create_app() -> FastAPI:
         expose_headers=["*"],
         max_age=3600,
     )
-
-    app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=600)
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):

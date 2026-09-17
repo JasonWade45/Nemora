@@ -125,7 +125,7 @@ export default function RepHome() {
   }
 
   const todayVisits = visits.filter(v => {
-    const t = v.planned_at || v.check_in_at || v.created_at;
+    const t = v.planned_at || v.checked_in_at || v.created_at;
     if (!t) return false;
     const d = new Date(t);
     const now = new Date();
@@ -147,13 +147,25 @@ export default function RepHome() {
         </p>
       </div>
 
+      {/* Loading skeleton */}
+      {loadingShift && (
+        <div className="space-y-5">
+          <div className="rounded-2xl bg-slate-200 h-40 animate-pulse" />
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => <div key={i} className="rounded-2xl bg-white border border-slate-200 p-4 h-24 animate-pulse" />)}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2].map((i) => <div key={i} className="rounded-2xl bg-white border border-slate-200 p-4 h-16 animate-pulse" />)}
+          </div>
+        </div>
+      )}
+
       {/* Shift card */}
+      {!loadingShift && (
       <div className={`rounded-2xl p-5 ${shift ? "bg-gradient-to-br from-teal-500 to-emerald-500" : "bg-gradient-to-br from-slate-800 to-slate-900"} text-white relative overflow-hidden`}>
         <div className="absolute -top-8 -end-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
         <div className="relative">
-          {loadingShift ? (
-            <div className="text-sm opacity-70">جاري التحميل...</div>
-          ) : shift ? (
+          {shift ? (
             <>
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -195,8 +207,10 @@ export default function RepHome() {
           )}
         </div>
       </div>
+      )}
 
       {/* Stats grid */}
+      {!loadingShift && (
       <div className="grid grid-cols-3 gap-3">
         <Link href="/rep/visits" className="rounded-2xl bg-white border border-slate-200 p-4 hover:border-sky-300 transition">
           <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center mb-2">
@@ -220,6 +234,7 @@ export default function RepHome() {
           <div className="text-[11px] text-slate-500">إجمالي الأطباء</div>
         </Link>
       </div>
+      )}
 
       {/* Active visit alert */}
       {activeVisit && (
@@ -231,7 +246,7 @@ export default function RepHome() {
             <div className="flex-1">
               <div className="text-sm font-semibold text-amber-900">لديك زيارة نشطة</div>
               <div className="text-xs text-amber-700 mt-0.5">
-                بدأت {fmtTime(activeVisit.check_in_at)} — اضغط للإنهاء
+                بدأت {fmtTime(activeVisit.checked_in_at)} — اضغط للإنهاء
               </div>
             </div>
             <span className="rtl:rotate-180 text-amber-500"><Icon d={icons.chevron} size={18} /></span>
@@ -240,6 +255,7 @@ export default function RepHome() {
       )}
 
       {/* Quick actions */}
+      {!loadingShift && (
       <div>
         <h2 className="text-sm font-semibold text-slate-700 mb-3">إجراءات سريعة</h2>
         <div className="grid grid-cols-2 gap-3">
@@ -263,27 +279,27 @@ export default function RepHome() {
           </Link>
         </div>
       </div>
+      )}
 
       {/* Today's visits */}
-      {todayVisits.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-700">زيارات اليوم</h2>
-            <Link href="/rep/visits" className="text-xs text-sky-600 hover:text-sky-700 font-medium">
-              عرض الكل
-            </Link>
-          </div>
+      {!loadingShift && (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-700">زيارات اليوم</h2>
+          <Link href="/rep/visits" className="text-xs text-sky-600 hover:text-sky-700 font-medium">
+            عرض الكل
+          </Link>
+        </div>
+        {todayVisits.length > 0 ? (
           <div className="space-y-2">
             {todayVisits.slice(0, 3).map((v) => (
               <Link key={v.id} href="/rep/visits" className="block rounded-xl bg-white border border-slate-200 p-3 hover:border-sky-300 transition">
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-2 rounded-full shrink-0 ${v.status === "COMPLETED" ? "bg-teal-500" : v.status === "CHECKED_IN" ? "bg-amber-500" : "bg-slate-300"}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-900 truncate">
-                      زيارة
-                    </div>
+                    <div className="text-sm font-medium text-slate-900 truncate">زيارة</div>
                     <div className="text-[11px] text-slate-500">
-                      {v.check_in_at ? `بدأت ${fmtTime(v.check_in_at)}` : v.planned_at ? `مجدولة ${fmtTime(v.planned_at)}` : "—"}
+                      {v.checked_in_at ? `بدأت ${fmtTime(v.checked_in_at)}` : v.planned_at ? `مجدولة ${fmtTime(v.planned_at)}` : "—"}
                     </div>
                   </div>
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
@@ -293,7 +309,15 @@ export default function RepHome() {
               </Link>
             ))}
           </div>
-        </div>
+        ) : (
+          <div className="rounded-2xl bg-white border border-slate-200 p-6 text-center">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-2">
+              <Icon d={icons.visits} size={18} />
+            </div>
+            <div className="text-xs text-slate-500">مفيش زيارات النهاردة</div>
+          </div>
+        )}
+      </div>
       )}
     </div>
   );

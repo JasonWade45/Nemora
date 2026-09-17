@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { NemoraLogo } from "@/components/brand/NemoraLogo";
 import { Icon, icons } from "@/components/ui/Icons";
 import { clearToken, getToken, apiFetch } from "@/lib/api";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useLanguage } from "@/lib/language-context";
 
 const PRODUCTS_ICON =
   "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z";
@@ -84,8 +86,10 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
     .join("")
     .toUpperCase();
 
+  const { lang, toggle } = useLanguage();
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-24" dir="rtl">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* ============ HEADER ============ */}
       <header className="sticky top-0 z-40 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 border-b border-slate-700/50 shadow-xl shadow-slate-900/10">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
@@ -130,6 +134,16 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
+          {/* Theme + Language toggles */}
+          <div className="flex items-center gap-1">
+            <button onClick={toggle}
+              className="px-2 py-1.5 rounded-lg text-[10px] font-bold bg-white/10 hover:bg-white/20 text-white transition"
+              aria-label="Toggle language">
+              {lang === "ar" ? "EN" : "عربي"}
+            </button>
+            <ThemeToggle className="text-white" />
+          </div>
+
           {/* NEMORA logo */}
           <Link href="/rep" className="flex items-center gap-2 shrink-0 group">
             <span className="text-base font-bold tracking-tight text-white group-hover:text-sky-300 transition">
@@ -141,10 +155,10 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Page content */}
-      <main className="max-w-3xl mx-auto px-4 py-5">{children}</main>
+      <main className="max-w-3xl mx-auto px-4 py-5 dark:text-slate-200">{children}</main>
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 shadow-2xl shadow-slate-900/5">
+      <nav className="fixed bottom-0 inset-x-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shadow-2xl shadow-slate-900/5">
         <div className="max-w-3xl mx-auto grid grid-cols-7">
           {TABS.map((tab) => {
             const active =
@@ -156,7 +170,7 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
                 key={tab.href}
                 href={tab.href}
                 className={`relative flex flex-col items-center gap-0.5 py-3 transition-all duration-200 ${
-                  active ? "text-sky-600" : "text-slate-400 hover:text-slate-600"
+                  active ? "text-sky-600 dark:text-sky-400" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                 }`}
               >
                 {active && (

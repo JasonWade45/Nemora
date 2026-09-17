@@ -139,10 +139,10 @@ export default function RepHome() {
     <div className="space-y-5">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
           أهلاً {user?.full_name?.split(" ")[0] ?? ""}
         </h1>
-        <p className="text-sm text-slate-600 mt-0.5">
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
           {new Date().toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" })}
         </p>
       </div>
@@ -150,12 +150,12 @@ export default function RepHome() {
       {/* Loading skeleton */}
       {loadingShift && (
         <div className="space-y-5">
-          <div className="rounded-2xl bg-slate-200 h-40 animate-pulse" />
+          <div className="rounded-2xl bg-slate-200 dark:bg-slate-700 h-40 animate-pulse" />
           <div className="grid grid-cols-3 gap-3">
-            {[1, 2, 3].map((i) => <div key={i} className="rounded-2xl bg-white border border-slate-200 p-4 h-24 animate-pulse" />)}
+            {[1, 2, 3].map((i) => <div key={i} className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 h-24 animate-pulse" />)}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {[1, 2].map((i) => <div key={i} className="rounded-2xl bg-white border border-slate-200 p-4 h-16 animate-pulse" />)}
+            {[1, 2].map((i) => <div key={i} className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 h-16 animate-pulse" />)}
           </div>
         </div>
       )}
@@ -212,26 +212,26 @@ export default function RepHome() {
       {/* Stats grid */}
       {!loadingShift && (
       <div className="grid grid-cols-3 gap-3">
-        <Link href="/rep/visits" className="rounded-2xl bg-white border border-slate-200 p-4 hover:border-sky-300 transition">
-          <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center mb-2">
+        <Link href="/rep/visits" className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 hover:border-sky-300 transition">
+          <div className="w-9 h-9 rounded-lg bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-2">
             <Icon d={icons.visits} size={18} />
           </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">{completedToday}</div>
-          <div className="text-[11px] text-slate-500">زيارات اليوم</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">{completedToday}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">زيارات اليوم</div>
         </Link>
-        <Link href="/rep/my-doctors" className="rounded-2xl bg-white border border-slate-200 p-4 hover:border-teal-300 transition">
-          <div className="w-9 h-9 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center mb-2">
+        <Link href="/rep/my-doctors" className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 hover:border-teal-300 transition">
+          <div className="w-9 h-9 rounded-lg bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 flex items-center justify-center mb-2">
             <Icon d={icons.doctors} size={18} />
           </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">{myDoctors.length}</div>
-          <div className="text-[11px] text-slate-500">أطبائي</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">{myDoctors.length}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">أطبائي</div>
         </Link>
-        <Link href="/rep/nearby" className="rounded-2xl bg-white border border-slate-200 p-4 hover:border-indigo-300 transition">
-          <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-2">
+        <Link href="/rep/nearby" className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 hover:border-indigo-300 transition">
+          <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2">
             <Icon d={icons.pin} size={18} />
           </div>
-          <div className="text-2xl font-bold text-slate-900 tabular-nums">{totalDoctors}</div>
-          <div className="text-[11px] text-slate-500">إجمالي الأطباء</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white tabular-nums">{totalDoctors}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">إجمالي الأطباء</div>
         </Link>
       </div>
       )}
@@ -257,24 +257,24 @@ export default function RepHome() {
       {/* Quick actions */}
       {!loadingShift && (
       <div>
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">إجراءات سريعة</h2>
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">إجراءات سريعة</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Link href="/rep/nearby" className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 hover:border-sky-300 transition">
+          <Link href="/rep/nearby" className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3 hover:border-sky-300 transition">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-500 text-white flex items-center justify-center shrink-0">
               <Icon d={icons.pin} size={18} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-slate-900">الأطباء القريبون</div>
-              <div className="text-[11px] text-slate-500">بحث بالـ GPS</div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white">الأطباء القريبون</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">بحث بالـ GPS</div>
             </div>
           </Link>
-          <Link href="/rep/my-doctors" className="rounded-2xl bg-white border border-slate-200 p-4 flex items-center gap-3 hover:border-teal-300 transition">
+          <Link href="/rep/my-doctors" className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3 hover:border-teal-300 transition">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 text-white flex items-center justify-center shrink-0">
               <Icon d={icons.doctors} size={18} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-slate-900">أطبائي</div>
-              <div className="text-[11px] text-slate-500">{myDoctors.length} طبيب</div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-white">أطبائي</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">{myDoctors.length} طبيب</div>
             </div>
           </Link>
         </div>
@@ -285,24 +285,24 @@ export default function RepHome() {
       {!loadingShift && (
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-slate-700">زيارات اليوم</h2>
-          <Link href="/rep/visits" className="text-xs text-sky-600 hover:text-sky-700 font-medium">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">زيارات اليوم</h2>
+          <Link href="/rep/visits" className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 font-medium">
             عرض الكل
           </Link>
         </div>
         {todayVisits.length > 0 ? (
           <div className="space-y-2">
             {todayVisits.slice(0, 3).map((v) => (
-              <Link key={v.id} href="/rep/visits" className="block rounded-xl bg-white border border-slate-200 p-3 hover:border-sky-300 transition">
+              <Link key={v.id} href="/rep/visits" className="block rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 hover:border-sky-300 transition">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${v.status === "COMPLETED" ? "bg-teal-500" : v.status === "CHECKED_IN" ? "bg-amber-500" : "bg-slate-300"}`} />
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${v.status === "COMPLETED" ? "bg-teal-500" : v.status === "CHECKED_IN" ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600"}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-900 truncate">زيارة</div>
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-sm font-medium text-slate-900 dark:text-white truncate">زيارة</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
                       {v.checked_in_at ? `بدأت ${fmtTime(v.checked_in_at)}` : v.planned_at ? `مجدولة ${fmtTime(v.planned_at)}` : "—"}
                     </div>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">
                     {v.status === "COMPLETED" ? "مكتملة" : v.status === "CHECKED_IN" ? "نشطة" : "مجدولة"}
                   </span>
                 </div>
@@ -310,11 +310,11 @@ export default function RepHome() {
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl bg-white border border-slate-200 p-6 text-center">
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-2">
+          <div className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 text-center">
+            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto mb-2">
               <Icon d={icons.visits} size={18} />
             </div>
-            <div className="text-xs text-slate-500">مفيش زيارات النهاردة</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">مفيش زيارات النهاردة</div>
           </div>
         )}
       </div>

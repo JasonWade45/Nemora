@@ -311,8 +311,8 @@ export default function VisitsListPage() {
       )}
 
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">زياراتي</h1>
-        <p className="text-sm text-slate-600 mt-0.5">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">زياراتي</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
           {loading ? "جاري التحميل..." : `${sortedList.length} / ${visits.length} زيارة`}
         </p>
       </div>
@@ -340,7 +340,7 @@ export default function VisitsListPage() {
             const on = filter === t.key;
             return (
               <button key={t.key} onClick={() => { setFilter(t.key); setShowDatePicker(false); setDateFrom(""); setDateTo(""); }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition border whitespace-nowrap ${on ? "bg-sky-500 text-white border-sky-500 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:border-sky-300"}`}>
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition border whitespace-nowrap ${on ? "bg-sky-500 text-white border-sky-500 shadow-sm" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-300"}`}>
                 {t.label}
                 <span className={`text-[10px] tabular-nums ${on ? "text-white/80" : "text-slate-400"}`}>{t.count}</span>
               </button>
@@ -353,7 +353,7 @@ export default function VisitsListPage() {
         </button>
         {moreFilters.length > 0 && (
           <button onClick={() => setShowMoreFilters(!showMoreFilters)}
-            className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-500 border-slate-200 hover:border-sky-300 transition whitespace-nowrap">
+            className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-sky-300 transition whitespace-nowrap">
             {showMoreFilters ? "إخفاء" : "المزيد"}
           </button>
         )}
@@ -363,13 +363,13 @@ export default function VisitsListPage() {
       {userPos && (
         <div className="flex items-center gap-2">
           <button onClick={() => setSortByDistance(false)}
-            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${!sortByDistance ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-600 border-slate-200 hover:border-sky-300"}`}>
+            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${!sortByDistance ? "bg-sky-500 text-white border-sky-500" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-300"}`}>
             <span className="inline-flex items-center gap-1.5 justify-center">
               <Icon d={icons.calendar} size={13} /> حسب الموعد
             </span>
           </button>
           <button onClick={() => setSortByDistance(true)}
-            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${sortByDistance ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-600 border-slate-200 hover:border-sky-300"}`}>
+            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${sortByDistance ? "bg-sky-500 text-white border-sky-500" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-300"}`}>
             <span className="inline-flex items-center gap-1.5 justify-center">
               <Icon d={icons.navigation} size={13} /> رتّب حسب الأقرب
             </span>
@@ -382,7 +382,7 @@ export default function VisitsListPage() {
         <div className="flex flex-wrap gap-2">
           {moreFilters.map((f) => (
             <button key={f.key} onClick={() => { setFilter(f.key); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${filter === f.key ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-600 border-slate-200"}`}>
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${filter === f.key ? "bg-sky-500 text-white border-sky-500" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}>
               {f.label} ({f.count})
             </button>
           ))}
@@ -391,16 +391,16 @@ export default function VisitsListPage() {
 
       {/* Custom date range picker */}
       {showDatePicker && (
-        <div className="rounded-xl bg-white border border-slate-200 p-3 space-y-2">
+        <div className="rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 w-8">من:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 w-8">من:</span>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-              className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700" />
+              className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-xs bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 w-8">إلى:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 w-8">إلى:</span>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-              className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700" />
+              className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-xs bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200" />
           </div>
           <div className="flex items-center gap-2 pt-1">
             {(dateFrom || dateTo) && (
@@ -419,24 +419,24 @@ export default function VisitsListPage() {
       {loading ? (
         <div className="space-y-2.5">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded-2xl bg-white border border-slate-200 p-4">
+            <div key={i} className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-slate-100 animate-pulse" />
+                <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-700 animate-pulse" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-40 bg-slate-100 rounded animate-pulse" />
-                  <div className="h-3 w-24 bg-slate-100 rounded animate-pulse" />
+                  <div className="h-4 w-40 bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />
+                  <div className="h-3 w-24 bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />
                 </div>
               </div>
             </div>
           ))}
         </div>
       ) : sortedList.length === 0 ? (
-        <div className="rounded-2xl bg-white border border-slate-200 p-12 text-center">
-          <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-4">
+        <div className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-12 text-center">
+          <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto mb-4">
             <Icon d={icons.visits} size={26} />
           </div>
-          <div className="text-base font-semibold text-slate-900 mb-1">لا توجد زيارات</div>
-          <p className="text-xs text-slate-500 mb-4">
+          <div className="text-base font-semibold text-slate-900 dark:text-white mb-1">لا توجد زيارات</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
             {filter === "today" && "مفيش زيارات النهاردة"}
             {filter === "tomorrow" && "مفيش زيارات بكرة"}
             {filter === "week" && "مفيش زيارات الأسبوع ده"}
@@ -498,10 +498,10 @@ function VisitCard({ visit: v, userPos, isNext, justCheckedIn, onStartVisit }: {
   }, [userPos, v.doctor_latitude, v.doctor_longitude]);
 
   return (
-    <div className={`group block rounded-2xl bg-white border-2 p-4 transition-all ${
-      justCheckedIn ? "border-teal-400 bg-teal-50/60 shadow-md shadow-teal-500/10" :
-      isNext ? "border-sky-400 bg-sky-50/40 shadow-md shadow-sky-500/10" :
-      "border-slate-200 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-500/5"
+    <div className={`group block rounded-2xl bg-white dark:bg-slate-800 border-2 p-4 transition-all ${
+      justCheckedIn ? "border-teal-400 bg-teal-50/60 dark:bg-teal-900/20 shadow-md shadow-teal-500/10" :
+      isNext ? "border-sky-400 bg-sky-50/40 dark:bg-sky-900/20 shadow-md shadow-sky-500/10" :
+      "border-slate-200 dark:border-slate-700 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-500/5"
     }`}>
       <div className="flex items-start gap-3.5">
         <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
@@ -513,19 +513,19 @@ function VisitCard({ visit: v, userPos, isNext, justCheckedIn, onStartVisit }: {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900 truncate">{v.doctor_name || "زيارة"}</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">{v.doctor_name || "زيارة"}</h3>
                 {isNext && isPlanned && (
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-500 text-white shrink-0">التالية</span>
                 )}
               </div>
-              {v.doctor_specialty && <div className="text-[11px] text-slate-500 mt-0.5">{v.doctor_specialty}</div>}
+              {v.doctor_specialty && <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{v.doctor_specialty}</div>}
             </div>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${meta.color}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />{meta.ar}
             </span>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
             {v.status === "COMPLETED" && v.duration_minutes != null && (
               <span className="inline-flex items-center gap-1"><Icon d={icons.dashboard} size={11} />{v.duration_minutes} دقيقة</span>
             )}
@@ -552,7 +552,7 @@ function VisitCard({ visit: v, userPos, isNext, justCheckedIn, onStartVisit }: {
               </button>
               {v.doctor_phone && (
                 <a href={`tel:${v.doctor_phone}`} onClick={(e) => e.stopPropagation()}
-                  className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition shrink-0">
+                  className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 transition shrink-0">
                   <Icon d={icons.phone} size={16} />
                 </a>
               )}
@@ -569,7 +569,7 @@ function VisitCard({ visit: v, userPos, isNext, justCheckedIn, onStartVisit }: {
           {!canStart && !isPlanned && v.doctor_phone && (
             <div className="mt-2 flex items-center gap-1.5">
               <a href={`tel:${v.doctor_phone}`} onClick={(e) => e.stopPropagation()}
-                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition">
+                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center text-slate-500 dark:text-slate-400 transition">
                 <Icon d={icons.phone} size={14} />
               </a>
               <a href={`https://wa.me/${v.doctor_phone.replace(/[^0-9]/g, "")}`} onClick={(e) => e.stopPropagation()}

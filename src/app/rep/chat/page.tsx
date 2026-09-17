@@ -67,9 +67,9 @@ export default function ChatPage() {
 
   if (activePeer) {
     return (
-      <div className="flex flex-col h-[calc(100vh-180px)]">
+      <div className="flex flex-col" style={{ height: "calc(100vh - 180px)" }}>
         {/* Chat header */}
-        <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-700 mb-3">
+        <div className="flex items-center gap-3 pb-3 border-b border-slate-200 dark:border-slate-700 mb-3 shrink-0">
           <button onClick={() => setActivePeer(null)} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
             <Icon d={icons.arrow_left} size={18} />
           </button>
@@ -83,21 +83,21 @@ export default function ChatPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-2 pb-3">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pb-3">
           {messages.length === 0 && (
             <div className="text-center text-xs text-slate-400 mt-10">ابدأ المحادثة</div>
           )}
           {messages.map((msg) => {
-            const isMe = msg.sender_id === activePeer ? false : true;
+            const isMine = msg.sender_id !== activePeer;
             return (
-              <div key={msg.id} className={`flex ${isMe ? "justify-start" : "justify-end"}`}>
+              <div key={msg.id} className={`flex ${isMine ? "justify-start" : "justify-end"}`}>
                 <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
-                  isMe
+                  isMine
                     ? "bg-sky-500 text-white rounded-br-md"
                     : "bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white rounded-bl-md"
                 }`}>
                   <div className="text-sm leading-relaxed">{msg.content}</div>
-                  <div className={`text-[9px] mt-0.5 ${isMe ? "text-sky-100" : "text-slate-400"}`}>
+                  <div className={`text-[9px] mt-0.5 ${isMine ? "text-sky-100" : "text-slate-400"}`}>
                     {new Date(msg.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
                   </div>
                 </div>
@@ -107,8 +107,8 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+        {/* Input — sticky above bottom nav */}
+        <div className="shrink-0 flex items-center gap-2 pt-2 pb-1 border-t border-slate-200 dark:border-slate-700">
           <input
             value={newMsg}
             onChange={(e) => setNewMsg(e.target.value)}

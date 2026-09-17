@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Doctor, getMyDoctors, Visit, getVisits } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
 
@@ -43,13 +44,18 @@ function getStatusColor(status: string): string {
   return colors[status] || colors.NONE;
 }
 
+const DoctorMapInner = dynamic(() => import("./MapInner"), { ssr: false, loading: () => (
+  <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center rounded-2xl" style={{ height: 400 }}>
+    <div className="w-5 h-5 border-2 border-slate-300 border-t-sky-500 rounded-full animate-spin" />
+  </div>
+)});
+
 export default function DoctorMapPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -80,16 +86,6 @@ export default function DoctorMapPage() {
     [doctors]
   );
 
-  const center = useMemo(() => {
-    if (userPos) return [userPos.lat, userPos.lng] as [number, number];
-    if (doctorsWithCoords.length > 0) {
-      const avgLat = doctorsWithCoords.reduce((s, d) => s + (d.latitude || 0), 0) / doctorsWithCoords.length;
-      const avgLng = doctorsWithCoords.reduce((s, d) => s + (d.longitude || 0), 0) / doctorsWithCoords.length;
-      return [avgLat, avgLng] as [number, number];
-    }
-    return [30.0444, 31.2357] as [number, number];
-  }, [userPos, doctorsWithCoords]);
-
   return (
     <div className="space-y-4">
       <div>
@@ -111,19 +107,17 @@ export default function DoctorMapPage() {
         </div>
       ) : (
         <div className="relative">
-          <div id="doctor-map" className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700" style={{ height: "70vh", minHeight: 400 }}>
-            <MapComponent
-              center={center}
+          <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700" style={{ height: "70vh", minHeight: 400 }}>
+            <DoctorMapInner
+              center={userPos ? [userPos.lat, userPos.lng] : doctorsWithCoords.length > 0 ? [doctorsWithCoords.reduce((s, d) => s + (d.latitude || 0), 0) / doctorsWithCoords.length, doctorsWithCoords.reduce((s, d) => s + (d.longitude || 0), 0) / doctorsWithCoords.length] : [30.0444, 31.2357]}
               doctors={doctorsWithCoords}
               visits={visits}
               userPos={userPos}
               onSelectDoctor={setSelectedDoctor}
               selectedDoctor={selectedDoctor}
-              onMapReady={() => setMapLoaded(true)}
             />
           </div>
 
-          {/* Legend */}
           <div className="absolute top-3 right-3 z-[1000] bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-2 space-y-1">
             {Object.entries(STATUS_COLORS).map(([status, color]) => (
               <div key={status} className="flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-400">
@@ -139,158 +133,10 @@ export default function DoctorMapPage() {
         </div>
       )}
 
-      {/* Doctor detail bottom sheet */}
       {selectedDoctor && (
         <DoctorSheet doctor={selectedDoctor} visits={visits} onClose={() => setSelectedDoctor(null)} />
       )}
     </div>
-  );
-}
-
-function MapComponent({ center, doctors, visits, userPos, onSelectDoctor, selectedDoctor, onMapReady }: {
-  center: [number, number];
-  doctors: Doctor[];
-  visits: Visit[];
-  userPos: { lat: number; lng: number } | null;
-  onSelectDoctor: (d: Doctor) => void;
-  selectedDoctor: Doctor | null;
-  onMapReady: () => void;
-}) {
-  const [MapContainer, setMapContainer] = useState<any>(null);
-  const [TileLayer, setTileLayer] = useState<any>(null);
-  const [Marker, setMarker] = useState<any>(null);
-  const [Popup, setPopup] = useState<any>(null);
-  const [useEffect, setUseEffect] = useState<any>(null);
-  const [useRef, setUseRef] = useState<any>(null);
-
-  useEffect(() => {
-    Promise.all([
-      import("react-leaflet"),
-      import("leaflet"),
-    ]).then(([rl, L]) => {
-      setMapContainer(() => rl.MapContainer);
-      setTileLayer(() => rl.TileLayer);
-      setMarker(() => rl.Marker);
-      setPopup(() => rl.Popup);
-      setUseEffect(() => rl.useEffect);
-      setUseRef(() => rl.useRef);
-
-      // Fix default marker icon
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-      });
-      onMapReady();
-    });
-  }, []);
-
-  if (!MapContainer) {
-    return <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"><div className="w-5 h-5 border-2 border-slate-300 border-t-sky-500 rounded-full animate-spin" /></div>;
-  }
-
-  return (
-    <MapContainer center={center} zoom={12} style={{ height: "100%", width: "100%" }} zoomControl={false}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {userPos && <UserMarker position={userPos} />}
-      {doctors.map((d) => (
-        <DoctorMarker
-          key={d.id}
-          doctor={d}
-          visits={visits}
-          isSelected={selectedDoctor?.id === d.id}
-          onClick={() => onSelectDoctor(d)}
-        />
-      ))}
-    </MapContainer>
-  );
-}
-
-function UserMarker({ position }: { position: { lat: number; lng: number } }) {
-  const [Marker, setMarker] = useState<any>(null);
-  const [useEffect, setUseEffect] = useState<any>(null);
-
-  useEffect(() => {
-    import("react-leaflet").then((rl) => {
-      setMarker(() => rl.Marker);
-      setUseEffect(() => rl.useEffect);
-    });
-  }, []);
-
-  if (!Marker) return null;
-
-  const L = require("leaflet");
-  const userIcon = new L.DivIcon({
-    className: "",
-    html: `<div style="width:20px;height:20px;background:#0ea5e9;border:3px solid white;border-radius:50%;box-shadow:0 0 10px rgba(14,165,233,0.5);"></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  });
-
-  return <Marker position={[position.lat, position.lng]} icon={userIcon} />;
-}
-
-function DoctorMarker({ doctor, visits, isSelected, onClick }: {
-  doctor: Doctor;
-  visits: Visit[];
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  const [Marker, setMarker] = useState<any>(null);
-  const [Popup, setPopup] = useState<any>(null);
-
-  useEffect(() => {
-    import("react-leaflet").then((rl) => {
-      setMarker(() => rl.Marker);
-      setPopup(() => rl.Popup);
-    });
-  }, []);
-
-  if (!Marker) return null;
-
-  const status = getVisitStatusForDoctor(doctor.id, visits);
-  const color = STATUS_COLORS[status] || "#94a3b8";
-
-  const L = require("leaflet");
-  const doctorIcon = new L.DivIcon({
-    className: "",
-    html: `<div style="
-      width:${isSelected ? 36 : 28}px;
-      height:${isSelected ? 36 : 28}px;
-      background:${color};
-      border:3px solid white;
-      border-radius:50%;
-      box-shadow:0 2px 8px rgba(0,0,0,0.3);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:white;
-      font-size:${isSelected ? 14 : 11}px;
-      font-weight:bold;
-      transition:all 0.2s;
-    ">${doctor.full_name?.charAt(0) || "?"}</div>`,
-    iconSize: [isSelected ? 36 : 28, isSelected ? 36 : 28],
-    iconAnchor: [isSelected ? 18 : 14, isSelected ? 18 : 14],
-  });
-
-  return (
-    <Marker
-      position={[doctor.latitude!, doctor.longitude!]}
-      icon={doctorIcon}
-      eventHandlers={{ click: onClick }}
-    >
-      <Popup>
-        <div style={{ direction: "rtl", textAlign: "right", minWidth: 150 }}>
-          <div style={{ fontWeight: "bold", fontSize: 14 }}>{doctor.full_name}</div>
-          {doctor.specialty && <div style={{ fontSize: 12, color: "#666" }}>{doctor.specialty}</div>}
-          <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>{getStatusLabel(status)}</div>
-        </div>
-      </Popup>
-    </Marker>
   );
 }
 

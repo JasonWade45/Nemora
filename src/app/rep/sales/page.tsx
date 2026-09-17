@@ -79,9 +79,10 @@ export default function RepSalesPage() {
 
   useEffect(() => {
     if (selectedProduct) {
-      if (!unitPrice) setUnitPrice(String(selectedProduct.category ? "" : ""));
+      if (!unitPrice && selectedProduct.unit_price != null) setUnitPrice(String(selectedProduct.unit_price));
+      if (!unitCost && selectedProduct.unit_cost != null) setUnitCost(String(selectedProduct.unit_cost));
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, unitPrice, unitCost]);
 
   function resetForm() {
     setDoctorId("");

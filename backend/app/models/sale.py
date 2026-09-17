@@ -10,7 +10,6 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
-    Index,
     Integer,
     func,
 )
@@ -43,7 +42,7 @@ class Sale(Base):
         String(36), ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True
     )
     visit_id: Mapped[Optional[str]] = mapped_column(
-        String(36), ForeignKey("visits.id", ondelete="SET NULL"), nullable=True, index=True
+        String(36), ForeignKey("visits.id", ondelete="SET NULL"), nullable=True
     )
 
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -67,12 +66,12 @@ class Sale(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-
-    __table_args__ = (
-        Index("ix_sales_org", "organization_id"),
-        Index("ix_sales_rep", "rep_id"),
-        Index("ix_sales_doctor", "doctor_id"),
-        Index("ix_sales_product", "product_id"),
-        Index("ix_sales_sold_at", "sold_at"),
-        Index("ix_sales_status", "status"),
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+    organization = relationship("Organization", back_populates="sales", viewonly=True)
+    rep = relationship("User", back_populates="sales", viewonly=True)
+    doctor = relationship("Doctor", back_populates="sales", viewonly=True)
+    product = relationship("Product", viewonly=True)
+    visit = relationship("Visit", viewonly=True)

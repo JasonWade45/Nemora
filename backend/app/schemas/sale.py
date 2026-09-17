@@ -45,6 +45,7 @@ class SaleResponse(BaseModel):
     notes: str | None = None
     sold_at: datetime
     created_at: datetime
+    updated_at: datetime | None = None
 
 
 class SaleListResponse(BaseModel):

@@ -19,6 +19,7 @@ const TABS = [
   { href: "/rep/my-doctors", label: "أطبائي",  icon: icons.doctors },
   { href: "/rep/sales",      label: "مبيعاتي", icon: SALES_ICON },
   { href: "/rep/visits",     label: "زياراتي", icon: icons.visits },
+  { href: "/rep/plan",       label: "خطتي",    icon: icons.calendar },
   { href: "/rep/profile",    label: "حسابي",   icon: icons.users },
 ];
 
@@ -144,7 +145,7 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-slate-200 shadow-2xl shadow-slate-900/5">
-        <div className="max-w-3xl mx-auto grid grid-cols-6">
+        <div className="max-w-3xl mx-auto grid grid-cols-7">
           {TABS.map((tab) => {
             const active =
               tab.href === "/rep"

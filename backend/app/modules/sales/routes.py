@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_db, require_roles
 from app.core.rbac import Role
@@ -22,23 +22,19 @@ from app.schemas.sale import (
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
-def _sale_to_response(db: Session, sale: Sale) -> SaleResponse:
-    rep = db.query(User).filter(User.id == sale.rep_id).first()
-    doctor = db.query(Doctor).filter(Doctor.id == sale.doctor_id).first()
-    product = db.query(Product).filter(Product.id == sale.product_id).first()
-
+def _sale_to_response(sale: Sale, rep_name: str | None, doctor_name: str | None, doctor_specialty: str | None, doctor_area: str | None, product_name: str | None, product_category: str | None) -> SaleResponse:
     return SaleResponse(
         id=sale.id,
         organization_id=sale.organization_id,
         rep_id=sale.rep_id,
-        rep_name=rep.full_name if rep else None,
+        rep_name=rep_name,
         doctor_id=sale.doctor_id,
-        doctor_name=doctor.full_name if doctor else None,
-        doctor_specialty=doctor.specialty if doctor else None,
-        doctor_area=doctor.area if doctor else None,
+        doctor_name=doctor_name,
+        doctor_specialty=doctor_specialty,
+        doctor_area=doctor_area,
         product_id=sale.product_id,
-        product_name=product.name if product else None,
-        product_category=product.category if product else None,
+        product_name=product_name,
+        product_category=product_category,
         visit_id=sale.visit_id,
         quantity=sale.quantity,
         unit_price=sale.unit_price,
@@ -51,6 +47,18 @@ def _sale_to_response(db: Session, sale: Sale) -> SaleResponse:
         sold_at=sale.sold_at,
         created_at=sale.created_at,
     )
+
+
+def _batch_load_related(db: Session, sales: list[Sale]):
+    rep_ids = list({s.rep_id for s in sales})
+    doctor_ids = list({s.doctor_id for s in sales})
+    product_ids = list({s.product_id for s in sales})
+
+    reps = {u.id: u.full_name for u in db.query(User).filter(User.id.in_(rep_ids)).all()} if rep_ids else {}
+    doctors = {d.id: d for d in db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).all()} if doctor_ids else {}
+    products = {p.id: p for p in db.query(Product).filter(Product.id.in_(product_ids)).all()} if product_ids else {}
+
+    return reps, doctors, products
 
 
 @router.get("", response_model=SaleListResponse)
@@ -86,15 +94,38 @@ def list_sales(
         except ValueError:
             pass
 
-    sales = q.order_by(Sale.sold_at.desc()).limit(limit).all()
-    total = q.count()
+    # Compute totals from ALL matching records (before limit)
+    totals_q = q.with_entities(
+        func.sum(Sale.total_price),
+        func.sum(Sale.total_cost),
+        func.sum(Sale.profit),
+    ).first()
 
-    total_revenue = sum(s.total_price for s in sales)
-    total_cost = sum(s.total_cost for s in sales)
-    total_profit = sum(s.profit for s in sales)
+    total = q.count()
+    total_revenue = float(totals_q[0] or 0)
+    total_cost = float(totals_q[1] or 0)
+    total_profit = float(totals_q[2] or 0)
+
+    sales = q.order_by(Sale.sold_at.desc()).limit(limit).all()
+
+    reps, doctors, products = _batch_load_related(db, sales)
+
+    items = []
+    for s in sales:
+        d = doctors.get(s.doctor_id)
+        p = products.get(s.product_id)
+        items.append(_sale_to_response(
+            s,
+            rep_name=reps.get(s.rep_id),
+            doctor_name=d.full_name if d else None,
+            doctor_specialty=d.specialty if d else None,
+            doctor_area=d.area if d else None,
+            product_name=p.name if p else None,
+            product_category=p.category if p else None,
+        ))
 
     return SaleListResponse(
-        items=[_sale_to_response(db, s) for s in sales],
+        items=items,
         total=total,
         total_revenue=round(total_revenue, 2),
         total_cost=round(total_cost, 2),
@@ -140,8 +171,6 @@ def sales_analytics(
             "revenue_trend": [],
         }
 
-    # Filter by doctor specialty/area if needed
-    sale_ids = [s.id for s in sales]
     doctor_ids = list({s.doctor_id for s in sales})
     product_ids = list({s.product_id for s in sales})
     rep_ids = list({s.rep_id for s in sales})
@@ -150,7 +179,6 @@ def sales_analytics(
     products_map = {p.id: p for p in db.query(Product).filter(Product.id.in_(product_ids)).all()}
     reps_map = {u.id: u for u in db.query(User).filter(User.id.in_(rep_ids)).all()}
 
-    # Apply specialty/area filters
     if specialty or area:
         filtered_sales = []
         for s in sales:
@@ -170,7 +198,6 @@ def sales_analytics(
     total_sales = len(sales)
     avg_sale_value = total_revenue / total_sales if total_sales > 0 else 0
 
-    # Top products
     product_stats: dict[str, dict] = {}
     for s in sales:
         pid = s.product_id
@@ -189,7 +216,6 @@ def sales_analytics(
     for item in top_products:
         item["revenue"] = round(item["revenue"], 2)
 
-    # Top reps
     rep_stats: dict[str, dict] = {}
     for s in sales:
         rid = s.rep_id
@@ -207,7 +233,6 @@ def sales_analytics(
     for item in top_reps:
         item["revenue"] = round(item["revenue"], 2)
 
-    # Top doctors
     doctor_stats: dict[str, dict] = {}
     for s in sales:
         did = s.doctor_id
@@ -227,7 +252,6 @@ def sales_analytics(
     for item in top_doctors:
         item["revenue"] = round(item["revenue"], 2)
 
-    # Revenue trend (last 14 days)
     trend: dict[str, dict] = {}
     for s in sales:
         day = s.sold_at.strftime("%Y-%m-%d") if s.sold_at else "unknown"
@@ -271,7 +295,18 @@ def get_sale(
     if sale.rep_id not in visible:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    return _sale_to_response(db, sale)
+    reps, doctors, products = _batch_load_related(db, [sale])
+    d = doctors.get(sale.doctor_id)
+    p = products.get(sale.product_id)
+    return _sale_to_response(
+        sale,
+        rep_name=reps.get(sale.rep_id),
+        doctor_name=d.full_name if d else None,
+        doctor_specialty=d.specialty if d else None,
+        doctor_area=d.area if d else None,
+        product_name=p.name if p else None,
+        product_category=p.category if p else None,
+    )
 
 
 @router.post("", response_model=SaleResponse, status_code=status.HTTP_201_CREATED)
@@ -344,7 +379,19 @@ def create_sale(
 
     db.commit()
     db.refresh(sale)
-    return _sale_to_response(db, sale)
+
+    reps, doctors, products = _batch_load_related(db, [sale])
+    d = doctors.get(sale.doctor_id)
+    p = products.get(sale.product_id)
+    return _sale_to_response(
+        sale,
+        rep_name=reps.get(sale.rep_id),
+        doctor_name=d.full_name if d else None,
+        doctor_specialty=d.specialty if d else None,
+        doctor_area=d.area if d else None,
+        product_name=p.name if p else None,
+        product_category=p.category if p else None,
+    )
 
 
 @router.patch("/{sale_id}", response_model=SaleResponse)
@@ -376,7 +423,6 @@ def update_sale(
     for k, v in updates.items():
         setattr(sale, k, v)
 
-    # Recalculate totals
     quantity = sale.quantity
     unit_price = sale.unit_price
     unit_cost = sale.unit_cost
@@ -386,7 +432,19 @@ def update_sale(
 
     db.commit()
     db.refresh(sale)
-    return _sale_to_response(db, sale)
+
+    reps, doctors, products = _batch_load_related(db, [sale])
+    d = doctors.get(sale.doctor_id)
+    p = products.get(sale.product_id)
+    return _sale_to_response(
+        sale,
+        rep_name=reps.get(sale.rep_id),
+        doctor_name=d.full_name if d else None,
+        doctor_specialty=d.specialty if d else None,
+        doctor_area=d.area if d else None,
+        product_name=p.name if p else None,
+        product_category=p.category if p else None,
+    )
 
 
 @router.delete("/{sale_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -405,6 +463,16 @@ def delete_sale(
     visible = get_visible_user_ids(db, current_user)
     if sale.rep_id not in visible:
         raise HTTPException(status_code=403, detail="Not allowed")
+
+    create_audit_log(
+        db,
+        organization_id=current_user.organization_id,
+        actor_user_id=current_user.id,
+        action="SALE_DELETED",
+        entity="Sale",
+        entity_id=sale.id,
+        metadata={"doctor_id": sale.doctor_id, "product_id": sale.product_id},
+    )
 
     db.delete(sale)
     db.commit()

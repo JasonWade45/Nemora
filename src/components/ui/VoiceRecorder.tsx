@@ -23,7 +23,8 @@ export function VoiceRecorder({
   const [duration, setDuration] = useState(0);
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
-  const forceStopRef = useRef(false);
+  const lastResultIndexRef = useRef(0);
+  const finalTextRef = useRef("");
 
   useEffect(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -39,11 +40,12 @@ export function VoiceRecorder({
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    forceStopRef.current = true;
     try { recognitionRef.current?.stop(); } catch {}
     recognitionRef.current = null;
     setIsRecording(false);
     setDuration(0);
+    lastResultIndexRef.current = 0;
+    finalTextRef.current = "";
   }, []);
 
   const toggleRecording = useCallback(() => {
@@ -58,7 +60,8 @@ export function VoiceRecorder({
       return;
     }
 
-    forceStopRef.current = false;
+    finalTextRef.current = transcript;
+    lastResultIndexRef.current = 0;
 
     const recognition = new SR();
     recognition.lang = "ar-EG";
@@ -66,16 +69,23 @@ export function VoiceRecorder({
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    let finalText = "";
-
     recognition.onresult = (event: any) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      let newText = finalTextRef.current;
+
+      for (let i = lastResultIndexRef.current; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
-          finalText += result[0].transcript + " ";
-          setTranscript(finalText.trim());
+          const spokenText = result[0].transcript.trim();
+          // Only add if it's not a duplicate of the last few words
+          if (!newText.endsWith(spokenText)) {
+            newText = newText ? newText + " " + spokenText : spokenText;
+          }
         }
       }
+
+      lastResultIndexRef.current = event.results.length;
+      finalTextRef.current = newText;
+      setTranscript(newText);
     };
 
     recognition.onerror = (event: any) => {
@@ -83,7 +93,7 @@ export function VoiceRecorder({
       if (event.error === "not-allowed") {
         setError("الرجاء السماح بالوصول للمايكروفون");
       } else if (event.error === "aborted" || event.error === "no-speech") {
-        // ignore — user stopped or no speech detected
+        // ignore
       } else {
         setError("خطأ: " + event.error);
       }
@@ -91,9 +101,7 @@ export function VoiceRecorder({
     };
 
     recognition.onend = () => {
-      if (!forceStopRef.current) {
-        cleanup();
-      }
+      cleanup();
     };
 
     recognitionRef.current = recognition;
@@ -117,7 +125,7 @@ export function VoiceRecorder({
       setError("فشل بدء التسجيل");
       cleanup();
     }
-  }, [isRecording, maxLength, cleanup]);
+  }, [isRecording, maxLength, cleanup, transcript]);
 
   useEffect(() => {
     if (transcript) {
@@ -132,7 +140,6 @@ export function VoiceRecorder({
   return (
     <div className={className}>
       <div className="flex items-center gap-2">
-        {/* Record button */}
         <button
           type="button"
           onClick={toggleRecording}
@@ -144,21 +151,9 @@ export function VoiceRecorder({
         >
           {isRecording && (
             <svg className="absolute inset-0 w-full h-full" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
               <circle
-                cx="20"
-                cy="20"
-                r="17"
-                fill="none"
-                stroke="rgba(255,255,255,0.3)"
-                strokeWidth="3"
-              />
-              <circle
-                cx="20"
-                cy="20"
-                r="17"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
+                cx="20" cy="20" r="17" fill="none" stroke="white" strokeWidth="3"
                 strokeDasharray={106.8}
                 strokeDashoffset={106.8 * (1 - progress)}
                 strokeLinecap="round"
@@ -170,7 +165,6 @@ export function VoiceRecorder({
           <Icon d={isRecording ? icons.close : icons.phone} size={18} />
         </button>
 
-        {/* Status */}
         <div className="flex-1 min-w-0">
           <div className="text-[11px] text-slate-500">
             {isRecording ? (
@@ -178,6 +172,8 @@ export function VoiceRecorder({
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 جاري التسجيل... {duration}s / {maxLength}s
               </span>
+            ) : transcript ? (
+              <span className="text-green-600 font-medium">تم التسجيل ✓</span>
             ) : (
               placeholder
             )}

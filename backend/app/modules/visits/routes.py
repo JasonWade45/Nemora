@@ -15,6 +15,7 @@ from app.models.user import User, UserRole
 from app.models.visit import DoctorResponse, Visit, VisitPurpose, VisitStatus
 from app.models.visit_product import VisitProduct
 from app.modules.audit.service import create_audit_log
+from app.modules.tracking.service import get_active_shift
 from app.schemas.visit import (
     VisitCheckInRequest,
     VisitCheckOutRequest,
@@ -250,6 +251,11 @@ def check_in(
         raise HTTPException(status_code=404, detail="Visit not found")
     if visit.status != VisitStatus.PLANNED:
         raise HTTPException(status_code=409, detail=f"Visit status is {visit.status.value}, expected PLANNED")
+
+    # Check for active shift
+    shift = get_active_shift(db, current_user.id)
+    if not shift:
+        raise HTTPException(status_code=400, detail="يجب بدء الشفت أولاً قبل تسجيل أي زيارة")
 
     doctor = db.query(Doctor).filter(Doctor.id == visit.doctor_id).first()
     if not doctor:

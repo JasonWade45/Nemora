@@ -24,6 +24,7 @@ from app.modules.sales.routes import router as sales_router
 from app.modules.plan.routes import router as plan_router
 from app.modules.notifications.routes import router as notifications_router
 from app.modules.chat.routes import router as chat_router
+from app.modules.gamification.routes import router as gamification_router
 
 settings = get_settings()
 
@@ -94,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(plan_router, prefix=api_prefix)
     app.include_router(notifications_router, prefix=api_prefix)
     app.include_router(chat_router, prefix=api_prefix)
+    app.include_router(gamification_router, prefix=api_prefix)
 
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

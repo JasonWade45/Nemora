@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { User, apiFetch, clearToken, getCurrentShift } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
 
@@ -11,18 +12,21 @@ export default function ProfilePage() {
   const [org, setOrg] = useState<{ name: string; slug: string } | null>(null);
   const [shiftActive, setShiftActive] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [gamification, setGamification] = useState<{ points: number; badges_count: number; total_badges: number } | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [u, o, s] = await Promise.all([
+        const [u, o, s, g] = await Promise.all([
           apiFetch<User>("/api/auth/me").catch(() => null),
           apiFetch<{ name: string; slug: string }>("/api/organizations/me").catch(() => null),
           getCurrentShift().catch(() => ({ active: false, shift: null })),
+          apiFetch<{ points: number; badges_count: number; total_badges: number }>("/api/gamification/my-stats").catch(() => null),
         ]);
         setMe(u);
         setOrg(o);
         setShiftActive(!!s?.active);
+        setGamification(g);
       } catch {}
       setLoading(false);
     })();
@@ -108,6 +112,27 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Gamification */}
+      {gamification && (
+        <Link href="/rep/gamification" className="block rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-5 hover:shadow-md transition">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">الإنجازات</div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500 rtl:rotate-180"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-black text-amber-700">{gamification.points}</div>
+              <div className="text-[10px] text-amber-600">نقطة</div>
+            </div>
+            <div className="h-10 w-px bg-amber-200" />
+            <div className="text-center">
+              <div className="text-2xl font-black text-amber-700">{gamification.badges_count}<span className="text-sm opacity-50">/{gamification.total_badges}</span></div>
+              <div className="text-[10px] text-amber-600">شارة</div>
+            </div>
+          </div>
+        </Link>
+      )}
 
       {/* Logout */}
       <button

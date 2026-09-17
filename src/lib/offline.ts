@@ -1,8 +1,10 @@
 const QUEUE_KEY = "nemora_offline_visits";
+const VISITS_CACHE_KEY = "nemora_cached_visits";
+const DOCTORS_CACHE_KEY = "nemora_cached_doctors";
 
 export type OfflineAction = {
   id: string;
-  type: "check_in" | "check_out";
+  type: "check_in" | "check_out" | "visit_update";
   visitId: string;
   payload: any;
   timestamp: number;
@@ -39,6 +41,40 @@ export function removeFromOfflineQueue(id: string) {
 export function clearOfflineQueue() {
   localStorage.removeItem(QUEUE_KEY);
   window.dispatchEvent(new Event("offline-queue-updated"));
+}
+
+export function cacheData(key: string, data: any) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, cached_at: Date.now() }));
+  } catch {}
+}
+
+export function getCachedData<T>(key: string, maxAgeMs = 30 * 60 * 1000): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { data, cached_at } = JSON.parse(raw);
+    if (Date.now() - cached_at > maxAgeMs) return null;
+    return data as T;
+  } catch {
+    return null;
+  }
+}
+
+export function cacheVisits(visits: any[]) {
+  cacheData(VISITS_CACHE_KEY, visits);
+}
+
+export function getCachedVisits() {
+  return getCachedData<any[]>(VISITS_CACHE_KEY);
+}
+
+export function cacheDoctors(doctors: any[]) {
+  cacheData(DOCTORS_CACHE_KEY, doctors);
+}
+
+export function getCachedDoctors() {
+  return getCachedData<any[]>(DOCTORS_CACHE_KEY);
 }
 
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

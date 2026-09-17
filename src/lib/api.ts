@@ -1159,3 +1159,45 @@ export async function confirmPlan(selections: VisitSelection[]): Promise<PlanCon
     body: JSON.stringify({ selections }),
   });
 }
+
+// ── Chat ────────────────────────────────────────────────────────────
+export type ChatMessage = {
+  id: string;
+  sender_id: string;
+  sender_name?: string | null;
+  receiver_id?: string | null;
+  receiver_name?: string | null;
+  group_name?: string | null;
+  content: string;
+  message_type: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type Conversation = {
+  peer_id?: string | null;
+  peer_name?: string | null;
+  group_name?: string | null;
+  last_message: string;
+  last_message_at: string;
+  unread_count: number;
+};
+
+export async function getConversations(): Promise<Conversation[]> {
+  return apiFetch("/api/chat/conversations");
+}
+
+export async function getMessages(peerId: string, limit = 50): Promise<ChatMessage[]> {
+  return apiFetch(`/api/chat/messages/${peerId}?limit=${limit}`);
+}
+
+export async function sendMessage(payload: { receiver_id?: string; group_name?: string; content: string }): Promise<ChatMessage> {
+  return apiFetch("/api/chat/messages", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getTeamMembers(): Promise<Array<{ id: string; full_name: string; email: string; role: string }>> {
+  return apiFetch("/api/chat/team");
+}

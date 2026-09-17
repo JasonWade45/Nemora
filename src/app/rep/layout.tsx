@@ -8,6 +8,7 @@ import { Icon, icons } from "@/components/ui/Icons";
 import { clearToken, getToken, apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useLanguage } from "@/lib/language-context";
+import { OfflineProvider, useOffline } from "@/lib/offline-context";
 
 const PRODUCTS_ICON =
   "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z";
@@ -24,10 +25,19 @@ const TABS = [
   { href: "/rep/sales",      label: "مبيعاتي", icon: SALES_ICON },
   { href: "/rep/visits",     label: "زياراتي", icon: icons.visits },
   { href: "/rep/plan",       label: "خطتي",    icon: icons.calendar },
+  { href: "/rep/chat",       label: "رسائل",   icon: icons.chat },
   { href: "/rep/profile",    label: "حسابي",   icon: icons.users },
 ];
 
 export default function RepLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <OfflineProvider>
+      <RepLayoutInner>{children}</RepLayoutInner>
+    </OfflineProvider>
+  );
+}
+
+function RepLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
@@ -89,9 +99,15 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
     .toUpperCase();
 
   const { lang, toggle } = useLanguage();
+  const { isOffline } = useOffline();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-24" dir={lang === "ar" ? "rtl" : "ltr"}>
+      {isOffline && (
+        <div className="bg-amber-500 text-white text-center text-[11px] font-semibold py-1.5 px-3">
+          أنت أوفلاين — هتتمام البيانات أول ما تتصل
+        </div>
+      )}
       {/* ============ HEADER ============ */}
       <header className="sticky top-0 z-40 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800 border-b border-slate-700/50 shadow-xl shadow-slate-900/10">
         <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
@@ -161,7 +177,7 @@ export default function RepLayout({ children }: { children: React.ReactNode }) {
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 inset-x-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shadow-2xl shadow-slate-900/5">
-        <div className="max-w-3xl mx-auto grid grid-cols-7">
+        <div className="max-w-3xl mx-auto grid grid-cols-8">
           {TABS.map((tab) => {
             const active =
               tab.href === "/rep"

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Visit, getActiveVisit, getVisits, checkInVisit } from "@/lib/api";
+import { Visit, getActiveVisit, getVisits, checkInVisit, getCurrentShift } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
 import {
   getOfflineQueue,
@@ -172,6 +172,18 @@ export default function VisitsListPage() {
   }, [offlineQueue.length, trySyncQueue]);
 
   const handleStartVisit = useCallback(async (visit: Visit) => {
+    // Check for active shift first
+    try {
+      const shiftRes = await getCurrentShift();
+      if (!shiftRes.active) {
+        alert("لازم تبدأ شيفت الأول قبل ما تبدأ أي زيارة. روح للوصة واضغط \"بدء الشفت\"");
+        return;
+      }
+    } catch {
+      alert("مش قادر أتحقق من حالة الشفت. تأكد من النت وحاول تاني.");
+      return;
+    }
+
     if (!navigator.geolocation) {
       alert("الجهاز لا يدعم تحديد الموقع");
       return;
@@ -188,7 +200,7 @@ export default function VisitsListPage() {
             try { await navigator.vibrate?.(100); } catch {}
             setTimeout(() => setCheckedInIds((prev) => { const n = new Set(prev); n.delete(visit.id); return n; }), 2000);
           } catch (e: any) {
-            alert(e?.message || "فشل تسجيل الدخول");
+            alert(e?.message || "فشل بدء الزيارة");
           }
         } else {
           addToOfflineQueue({ type: "check_in", visitId: visit.id, payload: { latitude, longitude, accuracy } });

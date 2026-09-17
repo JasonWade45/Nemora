@@ -1145,23 +1145,3 @@ export async function confirmPlan(selections: VisitSelection[]): Promise<PlanCon
     body: JSON.stringify({ selections }),
   });
 }
-
-// ============ Shifts ============
-
-export async function startShift(notes?: string) {
-  return apiFetch<any>("/api/shifts/start", {
-    method: "POST",
-    body: JSON.stringify({ notes: notes || null }),
-  });
-}
-
-export async function endShift(notes?: string) {
-  return apiFetch<any>("/api/shifts/end", {
-    method: "POST",
-    body: JSON.stringify({ notes: notes || null }),
-  });
-}
-
-export async function getCurrentShift() {
-  return apiFetch<any>("/api/shifts/current");
-}

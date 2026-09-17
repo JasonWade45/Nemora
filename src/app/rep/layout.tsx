@@ -9,6 +9,7 @@ import { clearToken, getToken, apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useLanguage } from "@/lib/language-context";
 import { OfflineProvider, useOffline } from "@/lib/offline-context";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 
 const PRODUCTS_ICON =
   "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z";
@@ -154,6 +155,7 @@ function RepLayoutInner({ children }: { children: React.ReactNode }) {
 
           {/* Theme + Language toggles */}
           <div className="flex items-center gap-1">
+            <NotificationBell />
             <button onClick={toggle}
               className="px-2 py-1.5 rounded-lg text-[10px] font-bold bg-white/10 hover:bg-white/20 text-white transition"
               aria-label="Toggle language">

@@ -19,8 +19,10 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column('doctors', sa.Column('is_platform', sa.Boolean(), nullable=False, server_default='0'))
     op.create_index(op.f('ix_doctors_is_platform'), 'doctors', ['is_platform'], unique=False)
+    op.alter_column('doctors', 'organization_id', existing_type=sa.String(length=36), nullable=True)
 
 
 def downgrade() -> None:
+    op.alter_column('doctors', 'organization_id', existing_type=sa.String(length=36), nullable=False)
     op.drop_index(op.f('ix_doctors_is_platform'), table_name='doctors')
     op.drop_column('doctors', 'is_platform')

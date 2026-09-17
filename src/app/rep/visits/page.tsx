@@ -5,28 +5,48 @@ import Link from "next/link";
 import { Visit, getActiveVisit, getVisits } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
 
-function fmtTime(dt) {
+function fmtTime(dt: string | null | undefined) {
   if (!dt) return "—";
   try {
     return new Date(dt).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
   } catch { return "—"; }
 }
 
-function fmtDate(dt) {
+function fmtDate(dt: string | null | undefined) {
+  if (!dt) return "—";
+  try {
+    return new Date(dt).toLocaleDateString("ar-EG", { day: "numeric", month: "short", year: "numeric" });
+  } catch { return "—"; }
+}
+
+function fmtDateShort(dt: string | null | undefined) {
   if (!dt) return "—";
   try {
     return new Date(dt).toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
   } catch { return "—"; }
 }
 
-function isToday(dt) {
+function toDateStr(dt: string | null | undefined): string | null {
+  if (!dt) return null;
+  try { return new Date(dt).toISOString().split("T")[0]; } catch { return null; }
+}
+
+function isToday(dt: string | null | undefined) {
+  if (!dt) return false;
+  try { return new Date(dt).toDateString() === new Date().toDateString(); } catch { return false; }
+}
+
+function isYesterday(dt: string | null | undefined) {
   if (!dt) return false;
   try {
-    return new Date(dt).toDateString() === new Date().toDateString();
+    const d = new Date(dt);
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    return d.toDateString() === y.toDateString();
   } catch { return false; }
 }
 
-const STATUS_META = {
+const STATUS_META: Record<string, { ar: string; color: string; dot: string }> = {
   PLANNED: { ar: "مخططة", color: "bg-slate-100 text-slate-700 border-slate-200", dot: "bg-slate-400" },
   CHECKED_IN: { ar: "نشطة", color: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-500" },
   COMPLETED: { ar: "مكتملة", color: "bg-teal-100 text-teal-700 border-teal-200", dot: "bg-teal-500" },
@@ -34,15 +54,22 @@ const STATUS_META = {
   CANCELLED: { ar: "ملغاة", color: "bg-slate-100 text-slate-500 border-slate-200", dot: "bg-slate-300" },
 };
 
-function statusMeta(s) {
+function statusMeta(s: string) {
   return STATUS_META[s] || STATUS_META.PLANNED;
 }
 
+function getVisitDate(v: Visit): string | null {
+  return toDateStr(v.checked_in_at) || toDateStr(v.planned_at) || toDateStr(v.created_at);
+}
+
+type Tab = "today" | "yesterday" | "planned" | "completed" | "history" | "all";
+
 export default function VisitsListPage() {
-  const [visits, setVisits] = useState([]);
-  const [active, setActive] = useState(null);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [active, setActive] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("today");
+  const [tab, setTab] = useState<Tab>("today");
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   useEffect(() => {
     (async () => {
@@ -62,14 +89,52 @@ export default function VisitsListPage() {
     if (tab === "today") {
       return visits.filter((v) => isToday(v.checked_in_at) || isToday(v.planned_at) || isToday(v.created_at));
     }
+    if (tab === "yesterday") {
+      return visits.filter((v) => isYesterday(v.checked_in_at) || isYesterday(v.planned_at) || isYesterday(v.created_at));
+    }
     if (tab === "completed") return visits.filter((v) => v.status === "COMPLETED");
     if (tab === "planned") return visits.filter((v) => v.status === "PLANNED");
-    return visits;
-  }, [visits, tab]);
+    if (tab === "history" && selectedDate) {
+      return visits.filter((v) => getVisitDate(v) === selectedDate);
+    }
+    if (tab === "all") return visits;
+    return [];
+  }, [visits, tab, selectedDate]);
 
   const todayCount = visits.filter((v) => isToday(v.checked_in_at) || isToday(v.planned_at)).length;
+  const yesterdayCount = visits.filter((v) => isYesterday(v.checked_in_at) || isYesterday(v.planned_at)).length;
   const completedCount = visits.filter((v) => v.status === "COMPLETED").length;
   const plannedCount = visits.filter((v) => v.status === "PLANNED").length;
+
+  const visitDates = useMemo(() => {
+    const dates = new Set<string>();
+    visits.forEach((v) => {
+      const d = getVisitDate(v);
+      if (d) dates.add(d);
+    });
+    return Array.from(dates).sort().reverse();
+  }, [visits]);
+
+  const historyByDate = useMemo(() => {
+    if (tab !== "all") return {};
+    const grouped: Record<string, Visit[]> = {};
+    visits.forEach((v) => {
+      const d = getVisitDate(v);
+      if (d) {
+        if (!grouped[d]) grouped[d] = [];
+        grouped[d].push(v);
+      }
+    });
+    return grouped;
+  }, [visits, tab]);
+
+  const tabs = [
+    { key: "today" as Tab, label: "اليوم", count: todayCount },
+    { key: "yesterday" as Tab, label: "أمس", count: yesterdayCount },
+    { key: "planned" as Tab, label: "مخططة", count: plannedCount },
+    { key: "completed" as Tab, label: "مكتملة", count: completedCount },
+    { key: "all" as Tab, label: "الكل", count: visits.length },
+  ];
 
   return (
     <div className="space-y-4">
@@ -77,7 +142,7 @@ export default function VisitsListPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">زياراتي</h1>
           <p className="text-sm text-slate-600 mt-0.5">
-            {loading ? "جاري التحميل..." : visits.length + " زيارة"}
+            {loading ? "جاري التحميل..." : `${visits.length} زيارة`}
           </p>
         </div>
         <Link
@@ -112,20 +177,16 @@ export default function VisitsListPage() {
         </Link>
       )}
 
-      <div className="flex gap-2">
-        {[
-          { key: "today", label: "اليوم", count: todayCount },
-          { key: "planned", label: "مخططة", count: plannedCount },
-          { key: "completed", label: "مكتملة", count: completedCount },
-          { key: "all", label: "الكل", count: visits.length },
-        ].map((t) => {
+      {/* Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {tabs.map((t) => {
           const on = tab === t.key;
           return (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => { setTab(t.key); setSelectedDate(""); }}
               className={
-                "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition border " +
+                "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition border whitespace-nowrap " +
                 (on
                   ? "bg-sky-500 text-white border-sky-500 shadow-sm"
                   : "bg-white text-slate-600 border-slate-200 hover:border-sky-300")
@@ -140,6 +201,31 @@ export default function VisitsListPage() {
         })}
       </div>
 
+      {/* Date picker for history */}
+      {tab === "all" && visitDates.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 shrink-0">تاريخ محدد:</span>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => {
+              setSelectedDate(e.target.value);
+              if (e.target.value) setTab("history");
+            }}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700"
+          />
+          {selectedDate && (
+            <button
+              onClick={() => { setSelectedDate(""); setTab("all"); }}
+              className="text-xs text-sky-600 font-medium hover:underline"
+            >
+              إلغاء
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Loading */}
       {loading ? (
         <div className="space-y-2.5">
           {[1, 2, 3].map((i) => (
@@ -160,7 +246,14 @@ export default function VisitsListPage() {
             <Icon d={icons.visits} size={26} />
           </div>
           <div className="text-base font-semibold text-slate-900 mb-1">لا توجد زيارات</div>
-          <p className="text-xs text-slate-500 mb-4">ابدأ زيارتك الأولى من هنا</p>
+          <p className="text-xs text-slate-500 mb-4">
+            {tab === "today" && "مفيش زيارات النهاردة"}
+            {tab === "yesterday" && "مفيش زيارات أمس"}
+            {tab === "planned" && "مفيش زيارات مخططة"}
+            {tab === "completed" && "مفيش زيارات مكتملة"}
+            {tab === "history" && selectedDate && `مفيش زيارات يوم ${fmtDate(selectedDate)}`}
+            {tab === "all" && "ابدأ زيارتك الأولى من هنا"}
+          </p>
           <Link
             href="/rep/visits/new"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition"
@@ -169,69 +262,97 @@ export default function VisitsListPage() {
             زيارة جديدة
           </Link>
         </div>
+      ) : tab === "all" && !selectedDate ? (
+        /* History grouped by date */
+        <div className="space-y-4">
+          {Object.entries(historyByDate).map(([date, dayVisits]) => (
+            <div key={date}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 rounded-full bg-sky-500" />
+                <span className="text-xs font-bold text-slate-700">{fmtDate(date)}</span>
+                <span className="text-[10px] text-slate-400">({dayVisits.length} زيارة)</span>
+              </div>
+              <div className="space-y-2">
+                {dayVisits.map((v) => (
+                  <VisitCard key={v.id} visit={v} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        /* Flat list */
         <div className="space-y-2.5">
-          {filtered.map((v) => {
-            const meta = statusMeta(v.status);
-            return (
-              <Link
-                key={v.id}
-                href={"/rep/visits/" + v.id}
-                className="group block rounded-2xl bg-white border border-slate-200 p-4 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-500/5 transition-all"
-              >
-                <div className="flex items-start gap-3.5">
-                  <div className={"w-11 h-11 rounded-xl flex items-center justify-center shrink-0 " + meta.color}>
-                    <Icon d={icons.visits} size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-slate-900 truncate group-hover:text-sky-700 transition">
-                          {v.doctor_name || "زيارة"}
-                        </h3>
-                        {v.doctor_specialty && (
-                          <div className="text-[11px] text-slate-500 mt-0.5">{v.doctor_specialty}</div>
-                        )}
-                      </div>
-                      <span className={"inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 " + meta.color}>
-                        <span className={"w-1.5 h-1.5 rounded-full " + meta.dot} />
-                        {meta.ar}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                      {v.status === "COMPLETED" && v.duration_minutes != null && (
-                        <span className="inline-flex items-center gap-1">
-                          <Icon d={icons.dashboard} size={11} />
-                          {v.duration_minutes} دقيقة
-                        </span>
-                      )}
-                      {v.checked_in_at && (
-                        <span className="inline-flex items-center gap-1">
-                          <Icon d={icons.visits} size={11} />
-                          بدأت {fmtTime(v.checked_in_at)}
-                        </span>
-                      )}
-                      {!v.checked_in_at && v.planned_at && (
-                        <span className="inline-flex items-center gap-1">
-                          <Icon d={icons.visits} size={11} />
-                          مخططة {fmtDate(v.planned_at)} · {fmtTime(v.planned_at)}
-                        </span>
-                      )}
-                      {v.distance_from_doctor != null && v.is_verified && (
-                        <span className="inline-flex items-center gap-1 text-teal-600 font-medium">
-                          <Icon d={icons.check} size={11} />
-                          موثقة GPS
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+          {filtered.map((v) => (
+            <VisitCard key={v.id} visit={v} />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+function VisitCard({ visit: v }: { visit: Visit }) {
+  const meta = statusMeta(v.status);
+  return (
+    <Link
+      href={"/rep/visits/" + v.id}
+      className="group block rounded-2xl bg-white border border-slate-200 p-4 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-500/5 transition-all"
+    >
+      <div className="flex items-start gap-3.5">
+        <div className={"w-11 h-11 rounded-xl flex items-center justify-center shrink-0 " + meta.color}>
+          <Icon d={icons.visits} size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-slate-900 truncate group-hover:text-sky-700 transition">
+                {v.doctor_name || "زيارة"}
+              </h3>
+              {v.doctor_specialty && (
+                <div className="text-[11px] text-slate-500 mt-0.5">{v.doctor_specialty}</div>
+              )}
+            </div>
+            <span className={"inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 " + meta.color}>
+              <span className={"w-1.5 h-1.5 rounded-full " + meta.dot} />
+              {meta.ar}
+            </span>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+            {v.visit_purpose && (
+              <span className="inline-flex items-center gap-1">
+                <Icon d={icons.calendar} size={11} />
+                {v.visit_purpose}
+              </span>
+            )}
+            {v.status === "COMPLETED" && v.duration_minutes != null && (
+              <span className="inline-flex items-center gap-1">
+                <Icon d={icons.dashboard} size={11} />
+                {v.duration_minutes} دقيقة
+              </span>
+            )}
+            {v.checked_in_at && (
+              <span className="inline-flex items-center gap-1">
+                <Icon d={icons.visits} size={11} />
+                بدأت {fmtTime(v.checked_in_at)}
+              </span>
+            )}
+            {!v.checked_in_at && v.planned_at && (
+              <span className="inline-flex items-center gap-1">
+                <Icon d={icons.visits} size={11} />
+                مخططة {fmtDateShort(v.planned_at)} · {fmtTime(v.planned_at)}
+              </span>
+            )}
+            {v.distance_from_doctor != null && v.is_verified && (
+              <span className="inline-flex items-center gap-1 text-teal-600 font-medium">
+                <Icon d={icons.check} size={11} />
+                موثقة GPS
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
   );
 }

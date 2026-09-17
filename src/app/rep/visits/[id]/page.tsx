@@ -14,6 +14,7 @@ import {
   removeProductFromVisit,
 } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
+import { VoiceRecorder } from "@/components/ui/VoiceRecorder";
 
 function fmtTime(dt: string | null | undefined): string {
   if (!dt) return "—";
@@ -714,6 +715,11 @@ export default function VisitDetailPage() {
             <label className="block text-xs font-semibold text-slate-700 mb-2">
               ملاحظات إضافية (اختياري)
             </label>
+            <VoiceRecorder
+              onTranscript={(text) => setNotes((prev) => prev ? prev + " " + text : text)}
+              placeholder="أو اضغط للتسجيل الصوتي..."
+              className="mb-2"
+            />
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

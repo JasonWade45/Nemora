@@ -179,7 +179,7 @@ export default function PlanBuilderPage() {
           <p className="text-xs text-slate-500 mt-0.5">
             {step === "done"
               ? `خطة ${result?.visits.length || 0} زيارة جاهزة`
-              : `اختر الدctors المراد زيارتهم_today`}
+              : `اختر الدكاترة المراد زيارتهم اليوم`}
           </p>
         </div>
         {step === "select" && !loading && (
@@ -265,7 +265,7 @@ export default function PlanBuilderPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
-              <p className="text-sm text-slate-500">لا توجد نتائج مطابقة لل filtro</p>
+              <p className="text-sm text-slate-500">لا توجد نتائج مطابقة للبحث</p>
             </div>
           ) : (
             <div className="space-y-2">

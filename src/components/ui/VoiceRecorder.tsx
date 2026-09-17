@@ -23,34 +23,39 @@ export function VoiceRecorder({
   const [duration, setDuration] = useState(0);
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<any>(null);
-  const lastResultIndexRef = useRef(0);
+  const spokenChunksRef = useRef<Set<string>>(new Set());
   const finalTextRef = useRef("");
 
   useEffect(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) setIsSupported(false);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      try { recognitionRef.current?.stop(); } catch {}
-    };
+    return () => stopRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const cleanup = useCallback(() => {
+  function stopRecording() {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    try { recognitionRef.current?.stop(); } catch {}
-    recognitionRef.current = null;
+    try {
+      if (recognitionRef.current) {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+    } catch {}
     setIsRecording(false);
     setDuration(0);
-    lastResultIndexRef.current = 0;
+    spokenChunksRef.current = new Set();
     finalTextRef.current = "";
-  }, []);
+  }
 
-  const toggleRecording = useCallback(() => {
+  function toggleRecording() {
     if (isRecording) {
-      cleanup();
+      stopRecording();
       return;
     }
 
@@ -60,8 +65,9 @@ export function VoiceRecorder({
       return;
     }
 
+    // Start fresh
     finalTextRef.current = transcript;
-    lastResultIndexRef.current = 0;
+    spokenChunksRef.current = new Set();
 
     const recognition = new SR();
     recognition.lang = "ar-EG";
@@ -69,39 +75,44 @@ export function VoiceRecorder({
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event: any) => {
-      let newText = finalTextRef.current;
+    let lastProcessedIndex = 0;
 
-      for (let i = lastResultIndexRef.current; i < event.results.length; i++) {
+    recognition.onresult = (event: any) => {
+      let newFinal = finalTextRef.current;
+
+      for (let i = lastProcessedIndex; i < event.results.length; i++) {
         const result = event.results[i];
+        if (!result || !result[0]) continue;
+
+        const text = result[0].transcript;
+
         if (result.isFinal) {
-          const spokenText = result[0].transcript.trim();
-          // Only add if it's not a duplicate of the last few words
-          if (!newText.endsWith(spokenText)) {
-            newText = newText ? newText + " " + spokenText : spokenText;
+          // Use a hash-like check: first 10 chars + length
+          const key = text.trim().substring(0, 20) + "|" + text.trim().length;
+          if (!spokenChunksRef.current.has(key)) {
+            spokenChunksRef.current.add(key);
+            newFinal = newFinal ? newFinal + " " + text.trim() : text.trim();
           }
         }
       }
 
-      lastResultIndexRef.current = event.results.length;
-      finalTextRef.current = newText;
-      setTranscript(newText);
+      lastProcessedIndex = event.results.length;
+      finalTextRef.current = newFinal;
+      setTranscript(newFinal);
     };
 
     recognition.onerror = (event: any) => {
-      console.warn("Speech error:", event.error);
       if (event.error === "not-allowed") {
         setError("الرجاء السماح بالوصول للمايكروفون");
-      } else if (event.error === "aborted" || event.error === "no-speech") {
-        // ignore
-      } else {
-        setError("خطأ: " + event.error);
       }
-      cleanup();
+      stopRecording();
     };
 
     recognition.onend = () => {
-      cleanup();
+      // Auto-stop — don't restart
+      if (isRecording) {
+        stopRecording();
+      }
     };
 
     recognitionRef.current = recognition;
@@ -114,24 +125,25 @@ export function VoiceRecorder({
 
       timerRef.current = setInterval(() => {
         setDuration((prev) => {
-          if (prev >= maxLength) {
-            cleanup();
+          if (prev + 1 >= maxLength) {
+            stopRecording();
             return 0;
           }
           return prev + 1;
         });
       }, 1000);
-    } catch (e: any) {
+    } catch {
       setError("فشل بدء التسجيل");
-      cleanup();
+      stopRecording();
     }
-  }, [isRecording, maxLength, cleanup, transcript]);
+  }
 
   useEffect(() => {
     if (transcript) {
       onTranscript(transcript);
     }
-  }, [transcript, onTranscript]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcript]);
 
   if (!isSupported) return null;
 

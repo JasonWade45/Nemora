@@ -20,6 +20,8 @@ from app.modules.products.routes import router as products_router
 from app.modules.uploads.routes import router as uploads_router
 from app.modules.analytics.routes import router as analytics_router
 from app.modules.super.routes import router as super_router
+from app.modules.sales.routes import router as sales_router
+from app.modules.plan.routes import router as plan_router
 
 settings = get_settings()
 
@@ -35,7 +37,6 @@ ALLOWED_ORIGINS = [
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
-    # CORS middleware FIRST (outermost) so headers always apply
     app.add_middleware(
         CORSMiddleware,
         allow_origins=ALLOWED_ORIGINS,
@@ -46,10 +47,8 @@ def create_app() -> FastAPI:
         max_age=3600,
     )
 
-    # Rate limit AFTER CORS (innermost)
     app.add_middleware(SimpleRateLimitMiddleware, requests_per_minute=600)
 
-    # Global exception handler — guarantees CORS headers on 500 errors
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         origin = request.headers.get("origin", "")
@@ -59,7 +58,6 @@ def create_app() -> FastAPI:
             headers["Access-Control-Allow-Credentials"] = "true"
             headers["Vary"] = "Origin"
 
-        # Log the full traceback so we can debug
         print("=" * 80)
         print("UNHANDLED EXCEPTION:")
         print(traceback.format_exc())
@@ -90,6 +88,8 @@ def create_app() -> FastAPI:
     app.include_router(uploads_router, prefix=api_prefix)
     app.include_router(analytics_router, prefix=api_prefix)
     app.include_router(super_router, prefix=api_prefix)
+    app.include_router(sales_router, prefix=api_prefix)
+    app.include_router(plan_router, prefix=api_prefix)
 
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 

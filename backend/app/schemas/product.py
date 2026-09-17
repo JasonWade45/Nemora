@@ -10,6 +10,8 @@ class ProductCreateRequest(BaseModel):
     description: str | None = None
     dosage_info: str | None = None
     image_url: str | None = None
+    unit_price: float | None = None
+    unit_cost: float | None = None
     visible_to_all: bool = False
     assigned_to_user_id: str | None = None
 
@@ -21,6 +23,8 @@ class ProductUpdateRequest(BaseModel):
     description: str | None = None
     dosage_info: str | None = None
     image_url: str | None = None
+    unit_price: float | None = None
+    unit_cost: float | None = None
     visible_to_all: bool | None = None
     assigned_to_user_id: str | None = None
     is_active: bool | None = None
@@ -40,6 +44,8 @@ class ProductResponse(BaseModel):
     description: str | None = None
     dosage_info: str | None = None
     image_url: str | None = None
+    unit_price: float | None = None
+    unit_cost: float | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime

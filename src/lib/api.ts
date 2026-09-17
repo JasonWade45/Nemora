@@ -491,6 +491,8 @@ export async function createProduct(payload: {
   description?: string | null;
   dosage_info?: string | null;
   image_url?: string | null;
+  unit_price?: number | null;
+  unit_cost?: number | null;
   visible_to_all?: boolean;
   assigned_to_user_id?: string | null;
 }): Promise<Product> {
@@ -507,6 +509,8 @@ export async function updateProduct(id: string, payload: Partial<{
   description: string | null;
   dosage_info: string | null;
   image_url: string | null;
+  unit_price: number | null;
+  unit_cost: number | null;
   visible_to_all: boolean;
   assigned_to_user_id: string | null;
   is_active: boolean;
@@ -1003,4 +1007,41 @@ export async function getSalesAnalytics(params?: {
   if (params?.product_id) q.set("product_id", params.product_id);
   const suffix = q.toString() ? "?" + q.toString() : "";
   return apiFetch(`/api/sales/analytics/overview${suffix}`);
+}
+
+// ============ Plan My Day ============
+
+export type PlanItem = {
+  doctor_id: string;
+  doctor_name: string;
+  specialty?: string | null;
+  area?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  priority?: string | null;
+  last_visit_at?: string | null;
+  days_since_visit?: number | null;
+  reason: string;
+  score: number;
+};
+
+export type PlanResponse = {
+  items: PlanItem[];
+  generated_at: string;
+  total: number;
+};
+
+export async function getPlanToday(params?: {
+  limit?: number;
+  lat?: number;
+  lng?: number;
+}): Promise<PlanResponse> {
+  const q = new URLSearchParams();
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.lat != null) q.set("lat", String(params.lat));
+  if (params?.lng != null) q.set("lng", String(params.lng));
+  const suffix = q.toString() ? "?" + q.toString() : "";
+  return apiFetch(`/api/plan/today${suffix}`);
 }

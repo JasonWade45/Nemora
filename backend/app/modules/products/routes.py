@@ -37,6 +37,8 @@ def _product_to_response(db: Session, product: Product) -> ProductResponse:
         description=product.description,
         dosage_info=product.dosage_info,
         image_url=product.image_url,
+        unit_price=product.unit_price,
+        unit_cost=product.unit_cost,
         is_active=product.is_active,
         created_at=product.created_at,
         updated_at=product.updated_at,
@@ -122,7 +124,10 @@ def create_product(
         category=payload.category,
         description=payload.description,
         dosage_info=payload.dosage_info,
-        image_url=payload.image_url,is_active=True,
+        image_url=payload.image_url,
+        unit_price=payload.unit_price,
+        unit_cost=payload.unit_cost,
+        is_active=True,
     )
     db.add(product)
     db.flush()

@@ -484,8 +484,7 @@ def discover_doctor(
         },
     )
 
-    from app.models.notification import Notification
-    from app.models.enums import NotificationType
+    from app.models.notification import Notification, NotificationType
 
     rep_name = current_user.full_name
     specialty_text = f" (تخصص: {doctor_specialty})" if doctor_specialty else ""

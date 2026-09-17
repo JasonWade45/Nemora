@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.models.enums import NotificationType
+from app.models.notification import NotificationType
 
 
 class NotificationResponse(BaseModel):

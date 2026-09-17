@@ -107,6 +107,9 @@ def _visit_to_response(db: Session, visit: Visit) -> VisitResponse:
 def list_visits(
     status_filter: VisitStatus | None = Query(default=None, alias="status"),
     doctor_id: str | None = Query(default=None),
+    rep_id: str | None = Query(default=None),
+    date_from: str | None = Query(default=None, description="YYYY-MM-DD"),
+    date_to: str | None = Query(default=None, description="YYYY-MM-DD"),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
@@ -121,6 +124,20 @@ def list_visits(
         q = q.filter(Visit.status == status_filter)
     if doctor_id:
         q = q.filter(Visit.doctor_id == doctor_id)
+    if rep_id:
+        q = q.filter(Visit.rep_id == rep_id)
+    if date_from:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            q = q.filter(Visit.created_at >= d)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+            q = q.filter(Visit.created_at <= d)
+        except ValueError:
+            pass
 
     total = q.count()
     visits = q.order_by(Visit.created_at.desc()).limit(limit).all()

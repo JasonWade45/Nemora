@@ -299,10 +299,21 @@ export type Visit = {
   updated_at: string;
 };
 
-export async function getVisits(params?: { status?: string; doctor_id?: string }): Promise<{ items: Visit[]; total: number }> {
+export async function getVisits(params?: {
+  status?: string;
+  doctor_id?: string;
+  rep_id?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+}): Promise<{ items: Visit[]; total: number }> {
   const q = new URLSearchParams();
   if (params?.status) q.set("status", params.status);
   if (params?.doctor_id) q.set("doctor_id", params.doctor_id);
+  if (params?.rep_id) q.set("rep_id", params.rep_id);
+  if (params?.date_from) q.set("date_from", params.date_from);
+  if (params?.date_to) q.set("date_to", params.date_to);
+  if (params?.limit) q.set("limit", String(params.limit));
   const suffix = q.toString() ? "?" + q.toString() : "";
   return apiFetch("/api/visits" + suffix);
 }

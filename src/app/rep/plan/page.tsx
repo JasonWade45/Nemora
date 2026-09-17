@@ -7,11 +7,11 @@ import {
   buildPlan,
   confirmPlan,
   getCurrentShift,
-  startShift,
   PlanDoctorItem,
   VISIT_PURPOSES,
   PlannedVisit,
   PlanConfirmResponse,
+  apiFetch,
 } from "@/lib/api";
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -21,7 +21,11 @@ const PRIORITY_COLORS: Record<string, string> = {
   LOW: "bg-green-100 text-green-700 border-green-200",
 };
 
-type Step = "loading" | "select" | "confirm" | "done";
+type Step = "loading" | "select" | "active" | "done";
+
+type VisitStatus = "PLANNED" | "CHECKED_IN" | "COMPLETED" | "MISSED" | "CANCELLED";
+
+type ActiveVisit = PlannedVisit & { status: VisitStatus };
 
 export default function PlanBuilderPage() {
   const router = useRouter();
@@ -35,20 +39,12 @@ export default function PlanBuilderPage() {
   const [selected, setSelected] = useState<Map<string, string>>(new Map());
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [result, setResult] = useState<PlanConfirmResponse | null>(null);
+  const [activeVisits, setActiveVisits] = useState<ActiveVisit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasActiveShift, setHasActiveShift] = useState(false);
 
   useEffect(() => {
     (async () => {
-      try {
-        const shift = await getCurrentShift();
-        if (shift.active) {
-          setHasActiveShift(true);
-          setStep("select");
-        }
-      } catch {}
-
       try {
         if (typeof navigator !== "undefined" && navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
@@ -63,7 +59,6 @@ export default function PlanBuilderPage() {
 
   useEffect(() => {
     if (step !== "loading" && step !== "select") return;
-    if (hasActiveShift) return;
     (async () => {
       setLoading(true);
       try {
@@ -78,7 +73,7 @@ export default function PlanBuilderPage() {
       }
       setLoading(false);
     })();
-  }, [step, gpsCoords, hasActiveShift]);
+  }, [step, gpsCoords]);
 
   const filtered = useMemo(() => {
     return doctors.filter((d) => {
@@ -97,20 +92,17 @@ export default function PlanBuilderPage() {
     });
   }, [doctors, filterArea, filterSpecialty, search]);
 
-  const toggleDoctor = useCallback(
-    (doctorId: string) => {
-      setSelected((prev) => {
-        const next = new Map(prev);
-        if (next.has(doctorId)) {
-          next.delete(doctorId);
-        } else {
-          next.set(doctorId, "DETAILING");
-        }
-        return next;
-      });
-    },
-    []
-  );
+  const toggleDoctor = useCallback((doctorId: string) => {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(doctorId)) {
+        next.delete(doctorId);
+      } else {
+        next.set(doctorId, "DETAILING");
+      }
+      return next;
+    });
+  }, []);
 
   const setPurpose = useCallback((doctorId: string, purpose: string) => {
     setSelected((prev) => {
@@ -134,9 +126,7 @@ export default function PlanBuilderPage() {
     });
   }, [filtered, selected]);
 
-  const deselectAll = useCallback(() => {
-    setSelected(new Map());
-  }, []);
+  const deselectAll = useCallback(() => setSelected(new Map()), []);
 
   async function handleConfirm() {
     if (selected.size === 0) return;
@@ -149,19 +139,51 @@ export default function PlanBuilderPage() {
       }));
       const res = await confirmPlan(selections);
       setResult(res);
-      setStep("done");
+      const visits: ActiveVisit[] = res.visits.map((v) => ({ ...v, status: "PLANNED" as VisitStatus }));
+      setActiveVisits(visits);
+      setStep("active");
     } catch (e: any) {
       let msg = "حدث خطأ";
-      try {
-        const parsed = JSON.parse(e.message);
-        msg = parsed.detail || msg;
-      } catch {
-        msg = e.message || msg;
-      }
+      try { msg = JSON.parse(e.message).detail || msg; } catch { msg = e.message || msg; }
       setError(msg);
     }
     setLoading(false);
   }
+
+  async function refreshVisitStatuses() {
+    if (!result) return;
+    try {
+      const visitIds = result.visits.map((v) => v.visit_id);
+      const statuses: ActiveVisit[] = [];
+      for (const v of result.visits) {
+        try {
+          const data: any = await apiFetch(`/api/visits/${v.visit_id}`);
+          statuses.push({ ...v, status: data.status || "PLANNED" });
+        } catch {
+          statuses.push({ ...v, status: "PLANNED" });
+        }
+      }
+      setActiveVisits(statuses);
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (step === "active") {
+      refreshVisitStatuses();
+      const interval = setInterval(refreshVisitStatuses, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [step, result]);
+
+  const completedCount = activeVisits.filter((v) => v.status === "COMPLETED").length;
+  const currentVisit = activeVisits.find((v) => v.status !== "COMPLETED");
+  const allDone = activeVisits.length > 0 && activeVisits.every((v) => v.status === "COMPLETED");
+
+  useEffect(() => {
+    if (allDone && step === "active") {
+      setStep("done");
+    }
+  }, [allDone, step]);
 
   const selectedDocs = useMemo(() => {
     return filtered.filter((d) => selected.has(d.doctor_id));
@@ -174,9 +196,10 @@ export default function PlanBuilderPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-800">خطتي اليومية</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            {step === "done"
-              ? `خطة ${result?.visits.length || 0} زيارة جاهزة`
-              : `اختر الدكاترة المراد زيارتهم اليوم`}
+            {step === "active" && `${completedCount}/${activeVisits.length} زيارة مكتملة`}
+            {step === "done" && `تم إكمال ${activeVisits.length} زيارة بنجاح`}
+            {step === "select" && "اختر الدكاترة المراد زيارتهم اليوم"}
+            {step === "loading" && "جاري تحميل الخطة..."}
           </p>
         </div>
         {step === "select" && !loading && (
@@ -188,6 +211,40 @@ export default function PlanBuilderPage() {
           </button>
         )}
       </div>
+
+      {/* Progress bar */}
+      {step === "active" && activeVisits.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-600">التقدم</span>
+            <span className="text-xs font-bold text-sky-600">{completedCount}/{activeVisits.length}</span>
+          </div>
+          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-sky-500 to-teal-500 rounded-full transition-all duration-500"
+              style={{ width: `${activeVisits.length > 0 ? (completedCount / activeVisits.length) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Current visit CTA */}
+      {step === "active" && currentVisit && (
+        <div className="bg-gradient-to-r from-sky-500 to-teal-500 rounded-2xl p-5 text-white text-center shadow-lg shadow-sky-500/20">
+          <div className="text-xs opacity-80 mb-1">ابدأ بـ</div>
+          <div className="text-lg font-bold mb-1">{currentVisit.doctor_name}</div>
+          <div className="text-xs opacity-80 mb-3">
+            {VISIT_PURPOSES.find((p) => p.value === currentVisit.visit_purpose)?.label || currentVisit.visit_purpose}
+          </div>
+          <a
+            href={`/rep/visits/${currentVisit.visit_id}`}
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-sky-600 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition"
+          >
+            <Icon d={icons.navigation} size={16} />
+            ابدأ الزيارة
+          </a>
+        </div>
+      )}
 
       {/* Loading */}
       {step === "loading" && (
@@ -209,13 +266,6 @@ export default function PlanBuilderPage() {
       {/* Select Step */}
       {step === "select" && !loading && (
         <>
-          {hasActiveShift && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-              <p className="text-xs text-amber-700 font-medium">لديك شيفت نشط بالفعل — الزيارات الجديدة هتتضاف للشيفت الحالي</p>
-            </div>
-          )}
-
-          {/* Filters */}
           {doctors.length > 0 && (
             <div className="space-y-2">
               <input
@@ -254,7 +304,6 @@ export default function PlanBuilderPage() {
             </div>
           )}
 
-          {/* Doctor List */}
           {doctors.length === 0 ? (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
               <Icon d={icons.calendar} size={40} className="mx-auto text-slate-300 mb-3" />
@@ -280,13 +329,10 @@ export default function PlanBuilderPage() {
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      {/* Checkbox */}
                       <button
                         onClick={() => toggleDoctor(d.doctor_id)}
                         className={`mt-1 w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${
-                          isSelected
-                            ? "bg-sky-500 border-sky-500"
-                            : "border-slate-300 hover:border-sky-400"
+                          isSelected ? "bg-sky-500 border-sky-500" : "border-slate-300 hover:border-sky-400"
                         }`}
                       >
                         {isSelected && (
@@ -295,8 +341,6 @@ export default function PlanBuilderPage() {
                           </svg>
                         )}
                       </button>
-
-                      {/* Doctor Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-bold text-slate-800 truncate">{d.doctor_name}</h3>
@@ -316,16 +360,12 @@ export default function PlanBuilderPage() {
                           )}
                         </div>
                       </div>
-
-                      {/* Order number */}
                       {isSelected && (
                         <div className="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                           {Array.from(selected.keys()).indexOf(d.doctor_id) + 1}
                         </div>
                       )}
                     </div>
-
-                    {/* Visit Purpose (only when selected) */}
                     {isSelected && (
                       <div className="mt-2.5 pt-2.5 border-t border-slate-100">
                         <div className="flex flex-wrap gap-1.5">
@@ -353,63 +393,145 @@ export default function PlanBuilderPage() {
         </>
       )}
 
+      {/* Active Step - Visit Queue */}
+      {step === "active" && (
+        <div className="space-y-2">
+          {activeVisits.map((v, idx) => {
+            const isCompleted = v.status === "COMPLETED";
+            const isCurrent = !isCompleted && v.visit_id === currentVisit?.visit_id;
+            const purposeLabel = VISIT_PURPOSES.find((p) => p.value === v.visit_purpose)?.label || v.visit_purpose;
+
+            return (
+              <div
+                key={v.visit_id}
+                className={`bg-white border rounded-xl p-4 transition-all ${
+                  isCompleted
+                    ? "border-emerald-200 bg-emerald-50/50"
+                    : isCurrent
+                    ? "border-sky-400 ring-2 ring-sky-100 shadow-sm"
+                    : "border-slate-200 opacity-60"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Status circle */}
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      isCompleted
+                        ? "bg-emerald-500 text-white"
+                        : isCurrent
+                        ? "bg-sky-500 text-white animate-pulse"
+                        : "bg-slate-200 text-slate-500"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      idx + 1
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className={`text-sm font-bold ${isCompleted ? "text-emerald-700" : "text-slate-800"}`}>
+                        {v.doctor_name}
+                      </h3>
+                      {isCompleted && (
+                        <span className="px-2 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-700 rounded-full">
+                          مكتملة
+                        </span>
+                      )}
+                      {isCurrent && (
+                        <span className="px-2 py-0.5 text-[9px] font-bold bg-sky-100 text-sky-700 rounded-full">
+                          الحالية
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">{purposeLabel}</div>
+
+                    <div className="flex items-center gap-2 mt-2">
+                      {!isCompleted && (
+                        <a
+                          href={`/rep/visits/${v.visit_id}`}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                            isCurrent
+                              ? "bg-sky-500 text-white hover:bg-sky-600"
+                              : "bg-white border border-slate-200 text-slate-700 hover:border-sky-300"
+                          }`}
+                        >
+                          {isCurrent ? (
+                            <>
+                              <Icon d={icons.navigation} size={12} />
+                              ابدأ الآن
+                            </>
+                          ) : (
+                            "انتظار"
+                          )}
+                        </a>
+                      )}
+                      {isCompleted && (
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M5 13l4 4L19 7" />
+                          </svg>
+                          تم الإكمال
+                        </span>
+                      )}
+                      {v.latitude && v.longitude && (
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${v.latitude},${v.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-medium bg-teal-50 text-teal-600 rounded-lg border border-teal-200 hover:bg-teal-100 transition"
+                        >
+                          <Icon d={icons.navigation} size={10} />
+                          اتجاه
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Done Step */}
-      {step === "done" && result && (
+      {step === "done" && (
         <div className="space-y-4">
-          {/* Success banner */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
                 <path d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-sm font-bold text-emerald-800">{result.message}</p>
-            {result.total_distance_km != null && (
-              <p className="text-xs text-emerald-600 mt-1">
-                المسافة الإجمالية: {result.total_distance_km} كم
-              </p>
-            )}
+            <p className="text-base font-bold text-emerald-800">أحسنت! خلصت كل الزيارات</p>
+            <p className="text-xs text-emerald-600 mt-1">
+              {activeVisits.length} زيارة مكتملة
+            </p>
           </div>
 
-          {/* Route map */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <h3 className="text-sm font-bold text-slate-800 mb-3">خط السير</h3>
-            <div className="space-y-0">
-              {result.visits.map((v, idx) => (
-                <div key={v.visit_id} className="flex gap-3">
-                  {/* Timeline */}
-                  <div className="flex flex-col items-center">
-                    <div className="w-7 h-7 rounded-full bg-sky-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                      {idx + 1}
-                    </div>
-                    {idx < result.visits.length - 1 && (
-                      <div className="w-0.5 flex-1 bg-sky-200 my-1" />
-                    )}
-                  </div>
-                  {/* Visit info */}
-                  <div className="pb-4 flex-1">
-                    <div className="text-sm font-bold text-slate-800">{v.doctor_name}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      {VISIT_PURPOSES.find((p) => p.value === v.visit_purpose)?.label || v.visit_purpose}
-                    </div>
-                    {v.latitude && v.longitude && (
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${v.latitude},${v.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-1.5 px-2.5 py-1 text-[10px] font-medium bg-teal-50 text-teal-600 rounded-lg border border-teal-200 hover:bg-teal-100 transition"
-                      >
-                        <Icon d={icons.navigation} size={10} />
-                        اتجاه
-                      </a>
-                    )}
+          <div className="space-y-2">
+            {activeVisits.map((v, idx) => (
+              <div key={v.visit_id} className="bg-white border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-slate-800">{v.doctor_name}</div>
+                  <div className="text-[11px] text-slate-500">
+                    {VISIT_PURPOSES.find((p) => p.value === v.visit_purpose)?.label || v.visit_purpose}
                   </div>
                 </div>
-              ))}
-            </div>
+                <span className="text-[10px] text-emerald-600 font-medium">تم</span>
+              </div>
+            ))}
           </div>
 
-          {/* Actions */}
           <div className="flex gap-2">
             <button
               onClick={() => router.push("/rep/visits")}

@@ -477,3 +477,81 @@ def delete_sale(
     db.delete(sale)
     db.commit()
     return None
+
+
+@router.get("/reports/period")
+def sales_period_report(
+    period: str = Query(default="week", regex="^(week|month)$"),
+    rep_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
+):
+    visible = get_visible_user_ids(db, current_user)
+    now = datetime.now(timezone.utc)
+
+    if period == "week":
+        start = now - timedelta(days=now.weekday())
+        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+        label = "أسبوعي"
+    else:
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        label = "شهري"
+
+    q = db.query(Sale).filter(
+        Sale.organization_id == current_user.organization_id,
+        Sale.rep_id.in_(visible),
+        Sale.sold_at >= start,
+    )
+    if rep_id:
+        q = q.filter(Sale.rep_id == rep_id)
+
+    sales = q.all()
+
+    total_revenue = sum(s.total_price for s in sales)
+    total_cost = sum(s.total_cost for s in sales)
+    total_profit = sum(s.profit for s in sales)
+    total_sales = len(sales)
+
+    rep_stats: dict[str, dict] = {}
+    product_stats: dict[str, dict] = {}
+    daily_stats: dict[str, dict] = {}
+
+    reps_map = {u.id: u for u in db.query(User).filter(User.id.in_(list({s.rep_id for s in sales}))).all()}
+    products_map = {p.id: p for p in db.query(Product).filter(Product.id.in_(list({s.product_id for s in sales}))).all()}
+
+    for s in sales:
+        rid = s.rep_id
+        if rid not in rep_stats:
+            rep_stats[rid] = {"id": rid, "name": reps_map.get(rid, type("", (), {"full_name": "—"})()).full_name, "revenue": 0, "cost": 0, "profit": 0, "count": 0}
+        rep_stats[rid]["revenue"] += s.total_price
+        rep_stats[rid]["cost"] += s.total_cost
+        rep_stats[rid]["profit"] += s.profit
+        rep_stats[rid]["count"] += 1
+
+        pid = s.product_id
+        if pid not in product_stats:
+            p = products_map.get(pid)
+            product_stats[pid] = {"id": pid, "name": p.name if p else "—", "quantity": 0, "revenue": 0}
+        product_stats[pid]["quantity"] += s.quantity
+        product_stats[pid]["revenue"] += s.total_price
+
+        day_str = s.sold_at.strftime("%Y-%m-%d") if s.sold_at else s.created_at.strftime("%Y-%m-%d")
+        if day_str not in daily_stats:
+            daily_stats[day_str] = {"date": day_str, "revenue": 0, "cost": 0, "count": 0}
+        daily_stats[day_str]["revenue"] += s.total_price
+        daily_stats[day_str]["cost"] += s.total_cost
+        daily_stats[day_str]["count"] += 1
+
+    return {
+        "period": label,
+        "start_date": start.isoformat(),
+        "end_date": now.isoformat(),
+        "total_revenue": total_revenue,
+        "total_cost": total_cost,
+        "total_profit": total_profit,
+        "total_sales": total_sales,
+        "avg_sale_value": total_revenue / total_sales if total_sales > 0 else 0,
+        "top_reps": sorted(rep_stats.values(), key=lambda x: x["revenue"], reverse=True)[:10],
+        "top_products": sorted(product_stats.values(), key=lambda x: x["revenue"], reverse=True)[:10],
+        "daily_trend": sorted(daily_stats.values(), key=lambda x: x["date"]),
+    }

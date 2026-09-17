@@ -15,9 +15,11 @@ const PRODUCTS_ICON =
 const SALES_ICON =
   "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 8m0 0h14M7 21h10";
 
+const MAP_ICON = "M12 22s-8-7.58-8-13a8 8 0 1 1 16 0c0 5.42-8 13-8 13z M12 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z";
+
 const TABS = [
   { href: "/rep",            label: "لوحتي",   icon: icons.dashboard },
-  { href: "/rep/nearby",     label: "قريبون",  icon: icons.pin },
+  { href: "/rep/map",        label: "خريطة",   icon: MAP_ICON },
   { href: "/rep/my-doctors", label: "أطبائي",  icon: icons.doctors },
   { href: "/rep/sales",      label: "مبيعاتي", icon: SALES_ICON },
   { href: "/rep/visits",     label: "زياراتي", icon: icons.visits },

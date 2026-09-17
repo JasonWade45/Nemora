@@ -32,6 +32,7 @@ class VisitCheckOutRequest(BaseModel):
     feedback_objections: str | None = None
     feedback_next_steps: str | None = None
     feedback_overall: str | None = None
+    signature_data: str | None = None
     send_to_admin: bool = True
 
 
@@ -73,6 +74,7 @@ class VisitResponse(BaseModel):
     feedback_objections: str | None = None
     feedback_next_steps: str | None = None
     feedback_overall: str | None = None
+    signature_data: str | None = None
     report_sent_to_admin_at: datetime | None = None
     report_forwarded_to_manager_at: datetime | None = None
     admin_notes: str | None = None

@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
 import { VoiceRecorder } from "@/components/ui/VoiceRecorder";
+import { SignaturePad } from "@/components/ui/SignaturePad";
 
 function fmtTime(dt: string | null | undefined): string {
   if (!dt) return "—";
@@ -155,6 +156,7 @@ export default function VisitDetailPage() {
   const [followUpDate, setFollowUpDate] = useState("");
   const [followUpNotes, setFollowUpNotes] = useState("");
   const [showCheckout, setShowCheckout] = useState(false);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
 
   // Feedback state
   const [feedback, setFeedback] = useState<Record<FeedbackKey, string>>({
@@ -314,6 +316,7 @@ export default function VisitDetailPage() {
         feedback_objections: feedback.feedback_objections || null,
         feedback_next_steps: feedback.feedback_next_steps || null,
         feedback_overall: feedback.feedback_overall || null,
+        signature_data: signatureData || null,
       });
       setVisit(updated);
       setShowCheckout(false);
@@ -579,8 +582,14 @@ export default function VisitDetailPage() {
                         </div>
                       </button>
                     );
-                  })}
-                </div>
+            })}
+            {visit.signature_data && (
+              <div>
+                <div className="text-[10px] font-semibold text-slate-500 mb-1.5">توقيع الطبيب</div>
+                <img src={visit.signature_data} alt="توقيع" className="max-w-[200px] rounded-lg border border-slate-200 bg-white" />
+              </div>
+            )}
+          </div>
               )}
             </div>
           )}
@@ -749,6 +758,17 @@ export default function VisitDetailPage() {
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-400"
               />
             </div>
+          </div>
+
+          {/* Signature */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-4">
+            <label className="block text-xs font-semibold text-slate-700 mb-2">
+              توقيع الطبيب
+            </label>
+            <SignaturePad
+              onSign={(data) => setSignatureData(data)}
+              onClear={() => setSignatureData(null)}
+            />
           </div>
 
           {/* Buttons */}

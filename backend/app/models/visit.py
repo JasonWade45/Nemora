@@ -79,6 +79,7 @@ class Visit(Base):
     report_sent_to_admin_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     report_forwarded_to_manager_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     admin_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    signature_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     organization_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
     )

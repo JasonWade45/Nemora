@@ -98,6 +98,7 @@ def _visit_to_response(db: Session, visit: Visit) -> VisitResponse:
         report_sent_to_admin_at=getattr(visit, "report_sent_to_admin_at", None),
         report_forwarded_to_manager_at=getattr(visit, "report_forwarded_to_manager_at", None),
         admin_notes=getattr(visit, "admin_notes", None),
+        signature_data=getattr(visit, "signature_data", None),
         products=products_list,
         created_at=visit.created_at,
         updated_at=visit.updated_at,
@@ -342,6 +343,8 @@ def check_out(
         visit.feedback_next_steps = payload.feedback_next_steps
     if payload.feedback_overall:
         visit.feedback_overall = payload.feedback_overall
+    if payload.signature_data:
+        visit.signature_data = payload.signature_data
 
     # Auto-send report to admin on completion
     if payload.send_to_admin:

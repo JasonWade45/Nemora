@@ -294,6 +294,7 @@ export type Visit = {
   report_sent_to_admin_at?: string | null;
   report_forwarded_to_manager_at?: string | null;
   admin_notes?: string | null;
+  signature_data?: string | null;
   products?: Array<{ id: string; name: string; category?: string | null }>;
   created_at: string;
   updated_at: string;
@@ -363,6 +364,7 @@ export async function checkOutVisit(visitId: string, payload: {
   feedback_objections?: string | null;
   feedback_next_steps?: string | null;
   feedback_overall?: string | null;
+  signature_data?: string | null;
   send_to_admin?: boolean;
 }): Promise<Visit> {
   return apiFetch("/api/visits/" + visitId + "/check-out", {
@@ -380,6 +382,7 @@ export async function checkOutVisit(visitId: string, payload: {
       feedback_objections: payload.feedback_objections ?? null,
       feedback_next_steps: payload.feedback_next_steps ?? null,
       feedback_overall: payload.feedback_overall ?? null,
+      signature_data: payload.signature_data ?? null,
       send_to_admin: payload.send_to_admin ?? true,
     }),
   });

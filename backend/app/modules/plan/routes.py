@@ -412,7 +412,7 @@ def plan_confirm(
 
     if len(doctors) != len(doctor_ids):
         found_ids = {d.id for d in doctors}
-        missing = [did for did in doctor_ids if did not found_ids]
+        missing = [did for did in doctor_ids if did not in found_ids]
         raise HTTPException(status_code=404, detail=f"أطباء غير موجودين: {', '.join(missing)}")
 
     # Create shift

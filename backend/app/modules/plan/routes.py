@@ -393,7 +393,15 @@ def plan_confirm(
         Shift.status == ShiftStatus.ACTIVE,
     ).first()
     if active:
-        raise HTTPException(status_code=409, detail="يوجد شيفت نشط بالفعل")
+        shift = active
+    else:
+        shift = Shift(
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            status=ShiftStatus.ACTIVE,
+        )
+        db.add(shift)
+        db.flush()
 
     # Validate visit purposes
     valid_purposes = {p.value for p in VisitPurpose}
@@ -414,15 +422,6 @@ def plan_confirm(
         found_ids = {d.id for d in doctors}
         missing = [did for did in doctor_ids if did not in found_ids]
         raise HTTPException(status_code=404, detail=f"أطباء غير موجودين: {', '.join(missing)}")
-
-    # Create shift
-    shift = Shift(
-        organization_id=current_user.organization_id,
-        user_id=current_user.id,
-        status=ShiftStatus.ACTIVE,
-    )
-    db.add(shift)
-    db.flush()
 
     # Create planned visits
     now = datetime.now(timezone.utc)

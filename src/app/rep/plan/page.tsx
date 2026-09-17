@@ -143,9 +143,6 @@ export default function PlanBuilderPage() {
     setLoading(true);
     setError(null);
     try {
-      if (!hasActiveShift) {
-        await startShift("خطة يومية");
-      }
       const selections = Array.from(selected.entries()).map(([doctor_id, visit_purpose]) => ({
         doctor_id,
         visit_purpose,

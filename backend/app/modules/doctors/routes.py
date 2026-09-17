@@ -407,3 +407,126 @@ def list_areas(
         })
     result.sort(key=lambda x: (x["area"] is None, -x["count"]))
     return result
+
+
+@router.post("/discover", response_model=DoctorResponse, status_code=status.HTTP_201_CREATED)
+def discover_doctor(
+    payload: DoctorCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(Role.MEDICAL_REP)),
+) -> DoctorResponse:
+    plan_key = _get_plan_key(db, current_user.organization_id)
+    current_doctors = db.query(Doctor).filter(
+        Doctor.organization_id == current_user.organization_id
+    ).count()
+    if not check_limit(plan_key, "doctors", current_doctors):
+        raise HTTPException(
+            status_code=402,
+            detail=f"وصلت للحد الأقصى للأطباء في خطة {plan_key}.",
+        )
+
+    rep_specialties = _safe_load_specialties(current_user.specialties_json)
+    focus_areas = get_focus_areas(db, current_user.organization_id)
+
+    doctor_specialty = (payload.specialty or "").strip()
+
+    rep_match = bool(doctor_specialty and doctor_specialty in rep_specialties) if rep_specialties else False
+    focus_match = bool(doctor_specialty and doctor_specialty in focus_areas) if focus_areas else True
+
+    if rep_specialties and not rep_match:
+        raise HTTPException(
+            status_code=403,
+            detail=f"تخصص الدكتور '{doctor_specialty}' مش من تخصصاتك: {', '.join(rep_specialties)}",
+        )
+
+    if payload.email:
+        existing = (
+            db.query(Doctor)
+            .filter(Doctor.organization_id == current_user.organization_id, Doctor.email == payload.email)
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=409, detail="Doctor email already exists")
+
+    doctor = Doctor(
+        organization_id=current_user.organization_id,
+        first_name=payload.first_name.strip(),
+        last_name=payload.last_name.strip(),
+        full_name=_normalize_full_name(payload.first_name, payload.last_name, payload.full_name),
+        specialty=doctor_specialty or None,
+        phone=payload.phone,
+        email=payload.email,
+        address=payload.address,
+        city=payload.city,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        notes=payload.notes,
+        status=DoctorStatus.ACTIVE,
+        priority=PriorityLevel.MEDIUM,
+        tags_json=json.dumps(["discovered"]),
+        working_hours_json=json.dumps({}),
+    )
+    db.add(doctor)
+    db.flush()
+
+    create_audit_log(
+        db,
+        organization_id=current_user.organization_id,
+        actor_user_id=current_user.id,
+        action="DOCTOR_DISCOVERED",
+        entity="Doctor",
+        entity_id=doctor.id,
+        metadata={
+            "doctor_name": doctor.full_name,
+            "specialty": doctor_specialty,
+            "rep_match": rep_match,
+            "focus_match": focus_match,
+        },
+    )
+
+    from app.models.notification import Notification
+    from app.models.enums import NotificationType
+
+    rep_name = current_user.full_name
+    specialty_text = f" (تخصص: {doctor_specialty})" if doctor_specialty else ""
+
+    if rep_match and focus_match:
+        admin_users = (
+            db.query(User)
+            .filter(User.organization_id == current_user.organization_id, User.role == Role.ADMIN)
+            .all()
+        )
+        manager_users = (
+            db.query(User)
+            .filter(User.organization_id == current_user.organization_id, User.role == Role.MANAGER)
+            .all()
+        )
+        notify_users = admin_users + manager_users
+        match_type = "تخصص الشركة + تخصص المندوب"
+    elif rep_match:
+        notify_users = (
+            db.query(User)
+            .filter(User.organization_id == current_user.organization_id, User.role == Role.MANAGER)
+            .all()
+        )
+        match_type = "تخصص المندوب فقط"
+    else:
+        notify_users = (
+            db.query(User)
+            .filter(User.organization_id == current_user.organization_id, User.role == Role.ADMIN)
+            .all()
+        )
+        match_type = "تخصص الشركة فقط"
+
+    for u in notify_users:
+        db.add(Notification(
+            user_id=u.id,
+            title="دكتور جديد تم اكتشافه",
+            message=f"المندوب {rep_name} أضاف دكتور{specialty_text}: {doctor.full_name}. التطابق: {match_type}",
+            type=NotificationType.SYSTEM,
+        ))
+
+    db.commit()
+    db.refresh(doctor)
+
+    return _doctor_to_response(doctor)

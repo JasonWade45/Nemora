@@ -138,6 +138,34 @@ export function buildMapsUrl(doctor: Doctor): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q || doctorDisplayName(doctor))}`;
 }
 
+export async function discoverDoctor(data: {
+  first_name: string;
+  last_name: string;
+  specialty?: string;
+  phone?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
+}): Promise<Doctor> {
+  return apiFetch<Doctor>("/api/doctors/discover", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getNotifications(page = 1, unreadOnly = false) {
+  return apiFetch<any>(`/api/notifications?page=${page}&unread_only=${unreadOnly}`);
+}
+
+export async function markNotificationRead(id: string) {
+  return apiFetch<any>(`/api/notifications/${id}/read`, { method: "POST" });
+}
+
+export async function markAllNotificationsRead() {
+  return apiFetch<any>("/api/notifications/read-all", { method: "POST" });
+}
+
 // ============ Live Map / Tracking ============
 
 export async function getTeamLocations() {

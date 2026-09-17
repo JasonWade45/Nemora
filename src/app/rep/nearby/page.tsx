@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Doctor, buildMapsUrl, doctorDisplayName, getAllDoctors } from "@/lib/api";
+import { Doctor, buildMapsUrl, doctorDisplayName, getAllDoctors, discoverDoctor } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
 
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -27,6 +26,18 @@ export default function NearbyPage() {
   const [gpsStatus, setGpsStatus] = useState<"loading" | "ok" | "denied" | "unsupported">("loading");
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState(2000);
+  const [showAddDoctor, setShowAddDoctor] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitResult, setSubmitResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const [form, setForm] = useState({
+    first_name: "",
+    last_name: "",
+    specialty: "",
+    phone: "",
+    address: "",
+    notes: "",
+  });
 
   useEffect(() => {
     (async () => {
@@ -65,8 +76,44 @@ export default function NearbyPage() {
       .sort((a, b) => a.distance - b.distance);
   }, [doctors, coords, radius]);
 
+  async function handleSubmit() {
+    if (!form.first_name.trim() || !form.last_name.trim()) return;
+    setSubmitting(true);
+    setSubmitResult(null);
+    try {
+      const doctor = await discoverDoctor({
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        specialty: form.specialty.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        address: form.address.trim() || undefined,
+        latitude: coords?.lat,
+        longitude: coords?.lng,
+        notes: form.notes.trim() || undefined,
+      });
+      setSubmitResult({ ok: true, msg: `تم إضافة الدكتور ${doctorDisplayName(doctor)} بنجاح` });
+      setDoctors((prev) => [...prev, doctor]);
+      setForm({ first_name: "", last_name: "", specialty: "", phone: "", address: "", notes: "" });
+      setTimeout(() => {
+        setShowAddDoctor(false);
+        setSubmitResult(null);
+      }, 2000);
+    } catch (e: any) {
+      let msg = "حدث خطأ";
+      try {
+        const parsed = JSON.parse(e.message);
+        msg = parsed.detail || msg;
+      } catch {
+        msg = e.message || msg;
+      }
+      setSubmitResult({ ok: false, msg });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">أطباء قريبون</h1>
         <p className="text-sm text-slate-600 mt-0.5">
@@ -172,6 +219,115 @@ export default function NearbyPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {gpsStatus === "ok" && (
+        <button
+          onClick={() => { setShowAddDoctor(true); setSubmitResult(null); }}
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-teal-500 text-white text-sm font-bold shadow-lg shadow-sky-500/30"
+        >
+          <Icon d={icons.plus} size={18} />
+          إضافة دكتور جديد
+        </button>
+      )}
+
+      {showAddDoctor && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setShowAddDoctor(false)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">إضافة دكتور جديد</h2>
+              <button onClick={() => setShowAddDoctor(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                <Icon d={icons.close} size={16} />
+              </button>
+            </div>
+
+            {submitResult && (
+              <div className={`rounded-xl p-3 text-sm font-medium ${submitResult.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                {submitResult.msg}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-700 mb-1 block">الاسم الأول *</label>
+                  <input
+                    type="text"
+                    value={form.first_name}
+                    onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    placeholder="أحمد"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-700 mb-1 block">اسم العائلة *</label>
+                  <input
+                    type="text"
+                    value={form.last_name}
+                    onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    placeholder="محمد"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700 mb-1 block">التخصص</label>
+                <input
+                  type="text"
+                  value={form.specialty}
+                  onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="مسالك بولية"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700 mb-1 block">الموبايل</label>
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="01012345678"
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700 mb-1 block">العنوان</label>
+                <input
+                  type="text"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="شارع التحرير، القاهرة"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-700 mb-1 block">ملاحظات</label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+                  rows={2}
+                  placeholder="أي ملاحظات..."
+                />
+              </div>
+            </div>
+
+            {coords && (
+              <div className="text-[10px] text-slate-400 text-center">
+                الموقع الحالي: {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+              </div>
+            )}
+
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !form.first_name.trim() || !form.last_name.trim()}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 text-white text-sm font-bold disabled:opacity-50"
+            >
+              {submitting ? "جاري الإضافة..." : "إضافة الدكتور"}
+            </button>
+          </div>
         </div>
       )}
     </div>

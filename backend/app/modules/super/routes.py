@@ -1,8 +1,9 @@
+import io
 import json
 import secrets
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from app.api.deps import get_current_user, get_db
 from app.core.security import create_access_token, hash_password
 from app.models.audit_log import AuditLog
 from app.models.doctor import Doctor
+from app.models.enums import DoctorStatus, PriorityLevel
 from app.models.notification import Notification, NotificationType
 from app.models.organization import Organization
 from app.models.user import User, UserRole
@@ -519,3 +521,304 @@ def system_health(
         "database": "ok" if db_ok else "error",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ============ Platform Doctors ============
+
+class PlatformDoctorResponse(BaseModel):
+    id: str
+    first_name: str
+    last_name: str
+    full_name: str
+    specialty: str | None
+    phone: str | None
+    email: str | None
+    address: str | None
+    city: str | None
+    area: str | None
+    latitude: float | None
+    longitude: float | None
+    status: str
+    created_at: datetime
+
+
+class ImportResult(BaseModel):
+    success: int
+    duplicates: int
+    failed: int
+    errors: list[dict]
+    total: int
+
+
+def _split_name(full_name: str) -> tuple[str, str]:
+    parts = full_name.strip().split()
+    if not parts:
+        return "Unknown", "-"
+    if len(parts) == 1:
+        return parts[0], "-"
+    return parts[0], " ".join(parts[1:])
+
+
+def _normalize_specialty(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    s = raw.strip()
+    return s if s else None
+
+
+@router.get("/doctors", response_model=list[PlatformDoctorResponse])
+def list_platform_doctors(
+    search: str | None = Query(default=None),
+    specialty: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_super_admin),
+):
+    q = db.query(Doctor).filter(Doctor.is_platform == True)
+
+    if search:
+        term = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                Doctor.full_name.ilike(term),
+                Doctor.specialty.ilike(term),
+                Doctor.phone.ilike(term),
+                Doctor.city.ilike(term),
+            )
+        )
+
+    if specialty:
+        q = q.filter(Doctor.specialty.ilike(f"%{specialty.strip()}%"))
+
+    total = q.count()
+    doctors = (
+        q.order_by(Doctor.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return [
+        PlatformDoctorResponse(
+            id=d.id,
+            first_name=d.first_name,
+            last_name=d.last_name,
+            full_name=d.full_name,
+            specialty=d.specialty,
+            phone=d.phone,
+            email=d.email,
+            address=d.address,
+            city=d.city,
+            area=d.area,
+            latitude=d.latitude,
+            longitude=d.longitude,
+            status=d.status.value if hasattr(d.status, 'value') else d.status,
+            created_at=d.created_at,
+        )
+        for d in doctors
+    ]
+
+
+@router.get("/doctors/stats")
+def platform_doctors_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_super_admin),
+):
+    total = db.query(func.count(Doctor.id)).filter(Doctor.is_platform == True).scalar() or 0
+    specialties = (
+        db.query(Doctor.specialty, func.count(Doctor.id))
+        .filter(Doctor.is_platform == True, Doctor.specialty.isnot(None))
+        .group_by(Doctor.specialty)
+        .all()
+    )
+    return {
+        "total": total,
+        "specialties": [{"specialty": s, "count": c} for s, c in specialties],
+    }
+
+
+@router.post("/doctors/import", response_model=ImportResult)
+async def import_platform_doctors(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_super_admin),
+):
+    if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="يجب رفع ملف Excel (.xlsx)")
+
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl not installed")
+
+    content = await file.read()
+    if len(content) > 50 * 1024 * 1024:  # 50MB limit
+        raise HTTPException(status_code=400, detail="الملف كبير جداً (الحد الأقصى 50MB)")
+
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="لا يمكن قراءة ملف Excel. تأكد من صيغة الملف.")
+
+    ws = wb.active
+    if not ws:
+        raise HTTPException(status_code=400, detail="الملف فارغ")
+
+    rows = list(ws.iter_rows(values_only=True))
+    if len(rows) < 2:
+        raise HTTPException(status_code=400, detail="الملف يجب أن يحتوي على صفوف بيانات على الأقل")
+
+    header = [str(h).strip().lower() if h else "" for h in rows[0]]
+
+    field_map = {
+        "name": ["name", "الاسم", "full_name", "doctor_name", "اسم الدكتور"],
+        "specialty": ["specialty", "التخصص", "specialization", "department", "القسم"],
+        "phone": ["phone", "الهاتف", "tel", "mobile", "جوال", "موبايل"],
+        "email": ["email", "البريد", "mail"],
+        "address": ["address", "العنوان", "clinic_address"],
+        "city": ["city", "المدينة", "المدينة"],
+        "area": ["area", "المنطقة", "region", "district"],
+        "latitude": ["latitude", "lat", "خط العرض"],
+        "longitude": ["longitude", "lng", "lon", "خط الطول"],
+    }
+
+    col_indices = {}
+    for field_name, aliases in field_map.items():
+        for i, col_name in enumerate(header):
+            if col_name in aliases:
+                col_indices[field_name] = i
+                break
+
+    if "name" not in col_indices:
+        raise HTTPException(
+            status_code=400,
+            detail=f"الملف يجب أن يحتوي على عمود 'name' أو 'الاسم'. الأعمدة الموجودة: {', '.join(header)}"
+        )
+
+    success = 0
+    duplicates = 0
+    failed = 0
+    errors = []
+
+    for row_idx, row in enumerate(rows[1:], start=2):
+        try:
+            raw_name = str(row[col_indices["name"]] or "").strip()
+            if not raw_name:
+                continue
+
+            first_name, last_name = _split_name(raw_name)
+
+            specialty = None
+            if "specialty" in col_indices:
+                specialty = _normalize_specialty(str(row[col_indices["specialty"]] or ""))
+
+            phone = None
+            if "phone" in col_indices:
+                raw_phone = str(row[col_indices["phone"]] or "").strip()
+                if raw_phone:
+                    if raw_phone.startswith("+20"):
+                        raw_phone = "0" + raw_phone[3:]
+                    phone = raw_phone[:50]
+
+            email = None
+            if "email" in col_indices:
+                raw_email = str(row[col_indices["email"]] or "").strip()
+                if raw_email and "@" in raw_email:
+                    email = raw_email[:320]
+
+            address = None
+            if "address" in col_indices:
+                address = str(row[col_indices["address"]] or "").strip()[:255] or None
+
+            city = None
+            if "city" in col_indices:
+                city = str(row[col_indices["city"]] or "").strip()[:120] or None
+
+            area = None
+            if "area" in col_indices:
+                area = str(row[col_indices["area"]] or "").strip()[:100] or None
+
+            latitude = None
+            if "latitude" in col_indices:
+                try:
+                    latitude = float(row[col_indices["latitude"]])
+                except (ValueError, TypeError):
+                    pass
+
+            longitude = None
+            if "longitude" in col_indices:
+                try:
+                    longitude = float(row[col_indices["longitude"]])
+                except (ValueError, TypeError):
+                    pass
+
+            # Check duplicate by name + phone within platform doctors
+            existing_q = db.query(Doctor).filter(
+                Doctor.is_platform == True,
+                Doctor.full_name == raw_name[:255],
+            )
+            if phone:
+                existing_q = existing_q.filter(Doctor.phone == phone)
+            if existing_q.first():
+                duplicates += 1
+                continue
+
+            doctor = Doctor(
+                organization_id=None,
+                is_platform=True,
+                first_name=first_name[:100],
+                last_name=last_name[:100],
+                full_name=raw_name[:255],
+                specialty=specialty,
+                phone=phone,
+                email=email,
+                address=address,
+                city=city,
+                area=area,
+                latitude=latitude,
+                longitude=longitude,
+                status=DoctorStatus.ACTIVE,
+                priority=PriorityLevel.MEDIUM,
+                tags_json="[]",
+                working_hours_json="{}",
+            )
+            db.add(doctor)
+            success += 1
+
+        except Exception as e:
+            failed += 1
+            errors.append({
+                "row": row_idx,
+                "name": str(row[col_indices.get("name", 0)] or "")[:100],
+                "error": str(e)[:200],
+            })
+
+        # Commit in batches of 500
+        if success % 500 == 0 and success > 0:
+            db.flush()
+
+    db.commit()
+    wb.close()
+
+    return ImportResult(
+        success=success,
+        duplicates=duplicates,
+        failed=failed,
+        errors=errors[:50],
+        total=success + duplicates + failed,
+    )
+
+
+@router.delete("/doctors/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_platform_doctor(
+    doctor_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_super_admin),
+):
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.is_platform == True).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found or not a platform doctor")
+    db.delete(doctor)
+    db.commit()
+    return None

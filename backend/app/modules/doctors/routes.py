@@ -1,7 +1,7 @@
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -116,7 +116,12 @@ def list_doctors(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
 ) -> DoctorListResponse:
-    query = db.query(Doctor).filter(Doctor.organization_id == current_user.organization_id)
+    query = db.query(Doctor).filter(
+        or_(
+            Doctor.organization_id == current_user.organization_id,
+            and_(Doctor.is_platform == True, Doctor.organization_id.is_(None)),
+        )
+    )
 
     # Apply organization focus areas filter (Admin + Manager only)
     # Medical rep is already filtered by their own specialties below
@@ -154,12 +159,22 @@ def list_doctors(
     if current_user.role.value == Role.MEDICAL_REP.value:
         rep_specialties = _safe_load_specialties(current_user.specialties_json)
         if rep_specialties:
-            query = query.filter(Doctor.specialty.in_(rep_specialties))
-        else:
-            query = query.join(DoctorAssignment, DoctorAssignment.doctor_id == Doctor.id).filter(
-                DoctorAssignment.organization_id == current_user.organization_id,
-                DoctorAssignment.medical_rep_id == current_user.id,
+            # Include org doctors + platform doctors with matching specialties
+            query = query.filter(
+                or_(
+                    and_(Doctor.organization_id == current_user.organization_id, Doctor.specialty.in_(rep_specialties)),
+                    and_(Doctor.is_platform == True, Doctor.organization_id.is_(None), Doctor.specialty.in_(rep_specialties)),
+                )
             )
+        else:
+            # Only org doctors via assignments
+            assigned_ids = [
+                a.doctor_id for a in db.query(DoctorAssignment.doctor_id).filter(
+                    DoctorAssignment.organization_id == current_user.organization_id,
+                    DoctorAssignment.medical_rep_id == current_user.id,
+                ).all()
+            ]
+            query = query.filter(Doctor.id.in_(assigned_ids))
 
     elif assigned_rep_id:
         query = query.join(DoctorAssignment, DoctorAssignment.doctor_id == Doctor.id).filter(
@@ -269,7 +284,13 @@ def get_doctor(
 ) -> DoctorResponse:
     doctor = (
         db.query(Doctor)
-        .filter(Doctor.id == doctor_id, Doctor.organization_id == current_user.organization_id)
+        .filter(
+            Doctor.id == doctor_id,
+            or_(
+                Doctor.organization_id == current_user.organization_id,
+                Doctor.is_platform == True,
+            ),
+        )
         .first()
     )
 
@@ -288,7 +309,13 @@ def update_doctor(
 ) -> DoctorResponse:
     doctor = (
         db.query(Doctor)
-        .filter(Doctor.id == doctor_id, Doctor.organization_id == current_user.organization_id)
+        .filter(
+            Doctor.id == doctor_id,
+            or_(
+                Doctor.organization_id == current_user.organization_id,
+                Doctor.is_platform == True,
+            ),
+        )
         .first()
     )
 
@@ -344,7 +371,13 @@ def list_doctor_workplaces(
 ) -> list[WorkplaceResponse]:
     doctor = (
         db.query(Doctor)
-        .filter(Doctor.id == doctor_id, Doctor.organization_id == current_user.organization_id)
+        .filter(
+            Doctor.id == doctor_id,
+            or_(
+                Doctor.organization_id == current_user.organization_id,
+                Doctor.is_platform == True,
+            ),
+        )
         .first()
     )
     if not doctor:
@@ -395,7 +428,10 @@ def list_areas(
         Doctor.area,
         sqlfunc.count(Doctor.id).label("cnt"),
     ).filter(
-        Doctor.organization_id == current_user.organization_id,
+        or_(
+            Doctor.organization_id == current_user.organization_id,
+            and_(Doctor.is_platform == True, Doctor.organization_id.is_(None)),
+        ),
     ).group_by(Doctor.area).all()
 
     result = []

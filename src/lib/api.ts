@@ -49,6 +49,7 @@ export type User = {
 
 export type Doctor = {
   id: string;
+  organization_id?: string | null;
   first_name?: string;
   last_name?: string;
   full_name?: string;
@@ -926,6 +927,81 @@ export async function getSystemHealth(): Promise<{
   timestamp: string;
 }> {
   return apiFetch("/api/super/system/health");
+}
+
+// ============ Platform Doctors (Super Admin) ============
+
+export type PlatformDoctor = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  specialty?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  area?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  status: string;
+  created_at: string;
+};
+
+export type ImportResult = {
+  success: number;
+  duplicates: number;
+  failed: number;
+  errors: Array<{ row: number; name: string; error: string }>;
+  total: number;
+};
+
+export type PlatformDoctorsStats = {
+  total: number;
+  specialties: Array<{ specialty: string; count: number }>;
+};
+
+export async function listPlatformDoctors(params?: {
+  search?: string;
+  specialty?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<PlatformDoctor[]> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set("search", params.search);
+  if (params?.specialty) q.set("specialty", params.specialty);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.page_size) q.set("page_size", String(params.page_size));
+  const suffix = q.toString() ? "?" + q.toString() : "";
+  return apiFetch<PlatformDoctor[]>(`/api/super/doctors${suffix}`);
+}
+
+export async function getPlatformDoctorsStats(): Promise<PlatformDoctorsStats> {
+  return apiFetch<PlatformDoctorsStats>("/api/super/doctors/stats");
+}
+
+export async function importPlatformDoctors(file: File): Promise<ImportResult> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_URL}/api/super/doctors/import`, {
+    method: "POST",
+    headers: {
+      "ngrok-skip-browser-warning": "true",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Import failed");
+  }
+  return res.json();
+}
+
+export async function deletePlatformDoctor(id: string): Promise<void> {
+  await apiFetch(`/api/super/doctors/${id}`, { method: "DELETE" });
 }
 
 // ============ Sales ============

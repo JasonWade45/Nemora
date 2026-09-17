@@ -57,7 +57,7 @@ class DoctorUpdateRequest(BaseModel):
 
 class DoctorResponse(BaseModel):
     id: str
-    organization_id: str
+    organization_id: str | None = None
 
     first_name: str
     last_name: str

@@ -9,17 +9,24 @@ import {
   OrganizationSummary,
   PlatformAnalytics,
   PlatformStats,
+  PlatformDoctor,
+  ImportResult,
+  PlatformDoctorsStats,
   activateOrganization,
   broadcastNotification,
   clearToken,
+  deletePlatformDoctor,
   getOrganization,
   getPlatformAnalytics,
+  getPlatformDoctorsStats,
   getSuperStats,
   getSystemHealth,
   getToken,
   impersonateUser,
+  importPlatformDoctors,
   listAuditLogs,
   listOrganizations,
+  listPlatformDoctors,
   resetUserPassword,
   superDeleteUser,
   superUpdateUser,
@@ -28,11 +35,12 @@ import {
 } from "@/lib/api";
 import { Icon, icons } from "@/components/ui/Icons";
 
-type Tab = "overview" | "organizations" | "audit" | "broadcast" | "analytics";
+type Tab = "overview" | "organizations" | "audit" | "broadcast" | "analytics" | "import-doctors";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "overview", label: "نظرة عامة", icon: icons.dashboard },
   { key: "organizations", label: "الشركات", icon: icons.users },
+  { key: "import-doctors", label: "دكاترة المنصة", icon: icons.doctors },
   { key: "analytics", label: "التحليلات", icon: icons.target },
   { key: "audit", label: "السجلات", icon: icons.reports },
   { key: "broadcast", label: "إشعار عام", icon: icons.visits },
@@ -139,6 +147,7 @@ export default function SuperAdminPage() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         {tab === "overview" && <OverviewTab stats={stats} orgs={orgs} />}
         {tab === "organizations" && <OrganizationsTab orgs={orgs} reload={loadOrgs} />}
+        {tab === "import-doctors" && <ImportDoctorsTab />}
         {tab === "analytics" && <AnalyticsTab />}
         {tab === "audit" && <AuditTab />}
         {tab === "broadcast" && <BroadcastTab />}
@@ -742,6 +751,267 @@ function BroadcastTab() {
             {sending ? "جاري الإرسال..." : "إرسال الإشعار"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============ Import Doctors Tab ============
+
+function ImportDoctorsTab() {
+  const [stats, setStats] = useState<PlatformDoctorsStats | null>(null);
+  const [doctors, setDoctors] = useState<PlatformDoctor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [search, setSearch] = useState("");
+  const [specialtyFilter, setSpecialtyFilter] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function loadStats() {
+    try {
+      const s = await getPlatformDoctorsStats();
+      setStats(s);
+    } catch {}
+  }
+
+  async function loadDoctors() {
+    setLoading(true);
+    try {
+      const d = await listPlatformDoctors({
+        search: search || undefined,
+        specialty: specialtyFilter || undefined,
+        page_size: 200,
+      });
+      setDoctors(d);
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    Promise.all([loadStats(), loadDoctors()]);
+  }, []);
+
+  useEffect(() => {
+    loadDoctors();
+  }, [search, specialtyFilter]);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setImportResult(null);
+    try {
+      const result = await importPlatformDoctors(file);
+      setImportResult(result);
+      await Promise.all([loadStats(), loadDoctors()]);
+    } catch (err: any) {
+      setImportResult({
+        success: 0,
+        duplicates: 0,
+        failed: 1,
+        errors: [{ row: 0, name: "", error: err.message || "Upload failed" }],
+        total: 1,
+      });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`هل أنت متأكد من حذف "${name}"؟`)) return;
+    setDeletingId(id);
+    try {
+      await deletePlatformDoctor(id);
+      await Promise.all([loadStats(), loadDoctors()]);
+    } catch (err: any) {
+      alert(err.message || "فشل الحذف");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5">
+          <div className="text-xs font-medium text-slate-500 mb-1">إجمالي الدكاترة</div>
+          <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">{stats?.total ?? 0}</div>
+        </div>
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5">
+          <div className="text-xs font-medium text-slate-500 mb-1">عدد التخصصات</div>
+          <div className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums">{stats?.specialties.length ?? 0}</div>
+        </div>
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5">
+          <div className="text-xs font-medium text-slate-500 mb-1">آخر استيراد</div>
+          <div className="text-lg font-bold text-slate-900 dark:text-white">
+            {doctors.length > 0 ? new Date(doctors[0].created_at).toLocaleDateString("ar-EG") : "—"}
+          </div>
+        </div>
+      </div>
+
+      {/* Upload Section */}
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6">
+        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">استيراد دكاترة من Excel</h3>
+        <p className="text-xs text-slate-500 mb-4">
+         ارفع ملف Excel يحتوي على أعمدة: name (الاسم)، specialty (التخصص)، phone (الهاتف)، email (البريد)، address (العنوان)، city (المدينة)، area (المنطقة).
+          الدكاترة ستظهر تلقائياً للشركات ذات التخصص المناسب.
+        </p>
+
+        <label className="block">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            disabled={uploading}
+            className="hidden"
+          />
+          <div className={`flex items-center justify-center gap-3 px-6 py-8 rounded-xl border-2 border-dashed transition cursor-pointer ${
+            uploading
+              ? "border-sky-300 bg-sky-50 dark:bg-sky-950"
+              : "border-slate-200 dark:border-slate-700 hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/50"
+          }`}>
+            {uploading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-sky-300 border-t-sky-600 rounded-full animate-spin" />
+                <span className="text-sm font-medium text-sky-700 dark:text-sky-300">جاري الاستيراد...</span>
+              </>
+            ) : (
+              <>
+                <Icon d={icons.plus} size={24} className="text-slate-400" />
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">اختر ملف Excel</span>
+              </>
+            )}
+          </div>
+        </label>
+
+        {/* Import Result */}
+        {importResult && (
+          <div className={`mt-4 rounded-xl px-4 py-3 ${
+            importResult.failed === 0 && importResult.errors.length === 0
+              ? "bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800"
+              : "bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800"
+          }`}>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <span className="font-semibold text-teal-700 dark:text-teal-300">تم الاستيراد: {importResult.success}</span>
+              <span className="text-slate-600 dark:text-slate-400">مكرر: {importResult.duplicates}</span>
+              {importResult.failed > 0 && (
+                <span className="font-semibold text-red-600">فشل: {importResult.failed}</span>
+              )}
+            </div>
+            {importResult.errors.length > 0 && (
+              <div className="mt-2 text-xs text-red-600 dark:text-red-400 max-h-32 overflow-y-auto">
+                {importResult.errors.slice(0, 10).map((err, i) => (
+                  <div key={i}>صف {err.row}: {err.name} — {err.error}</div>
+                ))}
+                {importResult.errors.length > 10 && <div>... و {importResult.errors.length - 10} أخطاء أخرى</div>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Specialty Distribution */}
+      {stats && stats.specialties.length > 0 && (
+        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3">التخصصات</h3>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSpecialtyFilter("")}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                !specialtyFilter
+                  ? "bg-sky-500 text-white"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+              }`}
+            >
+              الكل ({stats.total})
+            </button>
+            {stats.specialties.map((s) => (
+              <button
+                key={s.specialty}
+                onClick={() => setSpecialtyFilter(specialtyFilter === s.specialty ? "" : s.specialty)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                  specialtyFilter === s.specialty
+                    ? "bg-sky-500 text-white"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                }`}
+              >
+                {s.specialty} ({s.count})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Doctors Table */}
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            الدكاترة ({doctors.length})
+          </h3>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="بحث بالاسم أو التخصص أو الهاتف..."
+            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs w-64 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+          />
+        </div>
+
+        {loading ? (
+          <div className="text-center py-10">
+            <div className="w-6 h-6 border-2 border-slate-300 border-t-sky-500 rounded-full animate-spin mx-auto" />
+          </div>
+        ) : doctors.length === 0 ? (
+          <div className="text-center py-10 text-slate-500 text-sm">لا يوجد دكاترة بعد. ارفع ملف Excel للبدء.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">الاسم</th>
+                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">التخصص</th>
+                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">الهاتف</th>
+                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">المدينة</th>
+                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">المنطقة</th>
+                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {doctors.map((d) => (
+                  <tr key={d.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                    <td className="px-4 py-2.5">
+                      <div className="font-medium text-slate-900 dark:text-white">{d.full_name}</div>
+                      {d.email && <div className="text-[10px] text-slate-400" dir="ltr">{d.email}</div>}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {d.specialty && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                          {d.specialty}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400" dir="ltr">{d.phone || "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">{d.city || "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">{d.area || "—"}</td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => handleDelete(d.id, d.full_name)}
+                        disabled={deletingId === d.id}
+                        className="text-[10px] font-medium px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
+                      >
+                        {deletingId === d.id ? "..." : "حذف"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

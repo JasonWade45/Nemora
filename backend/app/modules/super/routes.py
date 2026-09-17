@@ -644,28 +644,45 @@ async def import_platform_doctors(
     db: Session = Depends(get_db),
     current_user: User = Depends(_require_super_admin),
 ):
-    if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="يجب رفع ملف Excel (.xlsx)")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="يجب رفع ملف")
 
-    try:
-        import openpyxl
-    except ImportError:
-        raise HTTPException(status_code=500, detail="openpyxl not installed")
+    is_csv = file.filename.lower().endswith('.csv')
+    is_excel = file.filename.lower().endswith(('.xlsx', '.xls'))
+
+    if not is_csv and not is_excel:
+        raise HTTPException(status_code=400, detail="يجب رفع ملف Excel (.xlsx) أو CSV (.csv)")
 
     content = await file.read()
     if len(content) > 50 * 1024 * 1024:  # 50MB limit
         raise HTTPException(status_code=400, detail="الملف كبير جداً (الحد الأقصى 50MB)")
 
-    try:
-        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-    except Exception:
-        raise HTTPException(status_code=400, detail="لا يمكن قراءة ملف Excel. تأكد من صيغة الملف.")
+    # Parse rows from CSV or Excel
+    rows = []
+    if is_csv:
+        import csv
+        text = content.decode('utf-8-sig')
+        reader = csv.reader(text.splitlines())
+        for row in reader:
+            rows.append(tuple(row))
+    else:
+        try:
+            import openpyxl
+        except ImportError:
+            raise HTTPException(status_code=500, detail="openpyxl not installed")
 
-    ws = wb.active
-    if not ws:
-        raise HTTPException(status_code=400, detail="الملف فارغ")
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail="لا يمكن قراءة ملف Excel. تأكد من صيغة الملف.")
 
-    rows = list(ws.iter_rows(values_only=True))
+        ws = wb.active
+        if not ws:
+            raise HTTPException(status_code=400, detail="الملف فارغ")
+
+        rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+
     if len(rows) < 2:
         raise HTTPException(status_code=400, detail="الملف يجب أن يحتوي على صفوف بيانات على الأقل")
 
@@ -799,7 +816,6 @@ async def import_platform_doctors(
             db.flush()
 
     db.commit()
-    wb.close()
 
     return ImportResult(
         success=success,

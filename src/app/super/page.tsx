@@ -855,16 +855,16 @@ function ImportDoctorsTab() {
 
       {/* Upload Section */}
       <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6">
-        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">استيراد دكاترة من Excel</h3>
+        <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">استيراد دكاترة من Excel أو CSV</h3>
         <p className="text-xs text-slate-500 mb-4">
-         ارفع ملف Excel يحتوي على أعمدة: name (الاسم)، specialty (التخصص)، phone (الهاتف)، email (البريد)، address (العنوان)، city (المدينة)، area (المنطقة).
+          ارفع ملف Excel أو CSV يحتوي على أعمدة: name (الاسم)، specialty (التخصص)، phone (الهاتف)، email (البريد)، address (العنوان)، city (المدينة)، area (المنطقة).
           الدكاترة ستظهر تلقائياً للشركات ذات التخصص المناسب.
         </p>
 
         <label className="block">
           <input
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.csv"
             onChange={handleFileUpload}
             disabled={uploading}
             className="hidden"
@@ -882,7 +882,7 @@ function ImportDoctorsTab() {
             ) : (
               <>
                 <Icon d={icons.plus} size={24} className="text-slate-400" />
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">اختر ملف Excel</span>
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">اختر ملف Excel أو CSV</span>
               </>
             )}
           </div>

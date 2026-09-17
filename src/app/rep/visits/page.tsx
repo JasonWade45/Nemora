@@ -132,8 +132,11 @@ export default function VisitsListPage() {
   useEffect(() => {
     if (!navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
-      (pos) => setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
+      (pos) => {
+        console.log("[GPS] Position:", pos.coords.latitude, pos.coords.longitude, "accuracy:", pos.coords.accuracy);
+        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      (err) => console.error("[GPS] Error:", err),
       { enableHighAccuracy: true, timeout: 10000 }
     );
     return () => navigator.geolocation.clearWatch(id);
@@ -243,19 +246,17 @@ export default function VisitsListPage() {
   // Distance-based sort override
   const sortedList = useMemo(() => {
     if (!sortByDistance || !userPos) return filtered.items;
-    return [...filtered.items].sort((a, b) => {
-      // Next visit always first even in distance mode
-      if (a.id === filtered.nextId) return -1;
-      if (b.id === filtered.nextId) return 1;
-      const aHasCoords = a.doctor_latitude != null && a.doctor_longitude != null;
-      const bHasCoords = b.doctor_latitude != null && b.doctor_longitude != null;
-      if (!aHasCoords && !bHasCoords) return 0;
-      if (!aHasCoords) return 1;
-      if (!bHasCoords) return -1;
-      const aDist = haversineDistance(userPos.lat, userPos.lng, a.doctor_latitude!, a.doctor_longitude!);
-      const bDist = haversineDistance(userPos.lat, userPos.lng, b.doctor_latitude!, b.doctor_longitude!);
-      return aDist - bDist;
+    const withDist = filtered.items.map((v) => {
+      const hasCoords = v.doctor_latitude != null && v.doctor_longitude != null;
+      const dist = hasCoords ? haversineDistance(userPos.lat, userPos.lng, v.doctor_latitude!, v.doctor_longitude!) : Infinity;
+      return { visit: v, dist, hasCoords };
     });
+    withDist.sort((a, b) => {
+      if (a.visit.id === filtered.nextId) return -1;
+      if (b.visit.id === filtered.nextId) return 1;
+      return a.dist - b.dist;
+    });
+    return withDist.map((x) => x.visit);
   }, [filtered, sortByDistance, userPos]);
 
   const todayCount = visits.filter((v) => isToday(v.checked_in_at) || isToday(v.planned_at)).length;
@@ -480,6 +481,7 @@ function VisitCard({ visit: v, userPos, isNext, justCheckedIn, onStartVisit }: {
     if (!userPos || !v.doctor_latitude || !v.doctor_longitude) return null;
     const km = haversineDistance(userPos.lat, userPos.lng, v.doctor_latitude, v.doctor_longitude);
     const eta = estimateTimeKm(km);
+    console.log(`[DIST] ${v.doctor_name}: user(${userPos.lat},${userPos.lng}) → doctor(${v.doctor_latitude},${v.doctor_longitude}) = ${km.toFixed(1)}km`);
     return { km, eta };
   }, [userPos, v.doctor_latitude, v.doctor_longitude]);
 

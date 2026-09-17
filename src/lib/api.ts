@@ -1061,6 +1061,60 @@ export type PlanResponse = {
   total: number;
 };
 
+export type PlanDoctorItem = {
+  doctor_id: string;
+  doctor_name: string;
+  specialty?: string | null;
+  area?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  priority?: string | null;
+  days_since_visit?: number | null;
+  last_visit_at?: string | null;
+  score: number;
+  selected?: boolean;
+};
+
+export type PlanBuildResponse = {
+  doctors: PlanDoctorItem[];
+  areas: string[];
+  specialties: string[];
+  total: number;
+};
+
+export type VisitSelection = {
+  doctor_id: string;
+  visit_purpose: string;
+};
+
+export type PlannedVisit = {
+  visit_id: string;
+  doctor_id: string;
+  doctor_name: string;
+  visit_purpose: string;
+  order: number;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+export type PlanConfirmResponse = {
+  shift_id: string;
+  visits: PlannedVisit[];
+  total_distance_km?: number | null;
+  message: string;
+};
+
+export const VISIT_PURPOSES = [
+  { value: "DETAILING", label: "عرض منتجات" },
+  { value: "FOLLOW_UP", label: "متابعة" },
+  { value: "PRODUCT_LAUNCH", label: "إطلاق منتج جديد" },
+  { value: "SAMPLE_DELIVERY", label: "توصيل عينات" },
+  { value: "MEDICAL_EDUCATION", label: "تعليم طبي" },
+  { value: "RELATIONSHIP_BUILDING", label: "بناء علاقة" },
+] as const;
+
 export async function getPlanToday(params?: {
   limit?: number;
   lat?: number;
@@ -1072,4 +1126,42 @@ export async function getPlanToday(params?: {
   if (params?.lng != null) q.set("lng", String(params.lng));
   const suffix = q.toString() ? "?" + q.toString() : "";
   return apiFetch(`/api/plan/today${suffix}`);
+}
+
+export async function buildPlan(params?: {
+  lat?: number;
+  lng?: number;
+}): Promise<PlanBuildResponse> {
+  const q = new URLSearchParams();
+  if (params?.lat != null) q.set("lat", String(params.lat));
+  if (params?.lng != null) q.set("lng", String(params.lng));
+  const suffix = q.toString() ? "?" + q.toString() : "";
+  return apiFetch(`/api/plan/build${suffix}`);
+}
+
+export async function confirmPlan(selections: VisitSelection[]): Promise<PlanConfirmResponse> {
+  return apiFetch<PlanConfirmResponse>("/api/plan/confirm", {
+    method: "POST",
+    body: JSON.stringify({ selections }),
+  });
+}
+
+// ============ Shifts ============
+
+export async function startShift(notes?: string) {
+  return apiFetch<any>("/api/shifts/start", {
+    method: "POST",
+    body: JSON.stringify({ notes: notes || null }),
+  });
+}
+
+export async function endShift(notes?: string) {
+  return apiFetch<any>("/api/shifts/end", {
+    method: "POST",
+    body: JSON.stringify({ notes: notes || null }),
+  });
+}
+
+export async function getCurrentShift() {
+  return apiFetch<any>("/api/shifts/current");
 }

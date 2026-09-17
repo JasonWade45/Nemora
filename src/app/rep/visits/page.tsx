@@ -24,11 +24,6 @@ function fmtDate(dt: string | null | undefined) {
   try { return new Date(dt).toLocaleDateString("ar-EG", { day: "numeric", month: "short", year: "numeric" }); } catch { return "—"; }
 }
 
-function fmtDateShort(dt: string | null | undefined) {
-  if (!dt) return "—";
-  try { return new Date(dt).toLocaleDateString("ar-EG", { day: "numeric", month: "short" }); } catch { return "—"; }
-}
-
 function toDateStr(dt: string | null | undefined): string | null {
   if (!dt) return null;
   try { return new Date(dt).toISOString().split("T")[0]; } catch { return null; }
@@ -37,6 +32,31 @@ function toDateStr(dt: string | null | undefined): string | null {
 function isToday(dt: string | null | undefined) {
   if (!dt) return false;
   try { return new Date(dt).toDateString() === new Date().toDateString(); } catch { return false; }
+}
+
+function isTomorrow(dt: string | null | undefined) {
+  if (!dt) return false;
+  try {
+    const d = new Date(dt);
+    const t = new Date();
+    t.setDate(t.getDate() + 1);
+    return d.toDateString() === t.toDateString();
+  } catch { return false; }
+}
+
+function isThisWeek(dt: string | null | undefined) {
+  if (!dt) return false;
+  try {
+    const d = new Date(dt);
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+    return d >= startOfWeek && d <= endOfWeek;
+  } catch { return false; }
 }
 
 function isYesterday(dt: string | null | undefined) {
@@ -70,7 +90,7 @@ function getVisitDate(v: Visit): string | null {
   return toDateStr(v.checked_in_at) || toDateStr(v.planned_at) || toDateStr(v.created_at);
 }
 
-type FilterMode = "today" | "yesterday" | "planned" | "completed" | "all";
+type FilterMode = "today" | "tomorrow" | "week" | "yesterday" | "planned" | "completed" | "all";
 
 export default function VisitsListPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -80,11 +100,12 @@ export default function VisitsListPage() {
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [sortByDistance, setSortByDistance] = useState(false);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [offlineQueue, setOfflineQueue] = useState<OfflineAction[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [checkedInIds, setCheckedInIds] = useState<Set<string>>(new Set());
-  const watchRef = useRef<((() => void) | null)>(null);
 
   useEffect(() => {
     (async () => {
@@ -179,45 +200,93 @@ export default function VisitsListPage() {
     );
   }, [active]);
 
+  // Filter
   const filtered = useMemo(() => {
     let list = visits;
     if (filter === "today") list = visits.filter((v) => isToday(v.checked_in_at) || isToday(v.planned_at) || isToday(v.created_at));
+    else if (filter === "tomorrow") list = visits.filter((v) => isTomorrow(v.planned_at));
+    else if (filter === "week") list = visits.filter((v) => isThisWeek(v.planned_at) || isThisWeek(v.checked_in_at));
     else if (filter === "yesterday") list = visits.filter((v) => isYesterday(v.checked_in_at) || isYesterday(v.planned_at) || isYesterday(v.created_at));
     else if (filter === "completed") list = visits.filter((v) => v.status === "COMPLETED");
     else if (filter === "planned") list = visits.filter((v) => v.status === "PLANNED");
-    return [...list].sort((a, b) => getPlannedTime(a) - getPlannedTime(b));
-  }, [visits, filter]);
+    else if (filter === "all" && (dateFrom || dateTo)) {
+      list = visits.filter((v) => {
+        const t = v.planned_at || v.checked_in_at || v.created_at;
+        if (!t) return false;
+        const d = new Date(t);
+        if (dateFrom && d < new Date(dateFrom)) return false;
+        if (dateTo) {
+          const to = new Date(dateTo);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      });
+    }
+
+    // BUG FIX: Always find the next upcoming PLANNED visit first
+    const now = Date.now();
+    const nextVisit = list.find((v) => v.status === "PLANNED" && getPlannedTime(v) >= now);
+    const nextId = nextVisit?.id || null;
+
+    // Sort remaining visits by planned time ascending (BUG FIX #2: compare timestamps, not display strings)
+    const sorted = [...list].sort((a, b) => {
+      // Next visit always first
+      if (a.id === nextId) return -1;
+      if (b.id === nextId) return 1;
+      return getPlannedTime(a) - getPlannedTime(b);
+    });
+
+    return { items: sorted, nextId };
+  }, [visits, filter, dateFrom, dateTo]);
+
+  // Distance-based sort override
+  const sortedList = useMemo(() => {
+    if (!sortByDistance || !userPos) return filtered.items;
+    return [...filtered.items].sort((a, b) => {
+      // Next visit always first even in distance mode
+      if (a.id === filtered.nextId) return -1;
+      if (b.id === filtered.nextId) return 1;
+      const aHasCoords = a.doctor_latitude != null && a.doctor_longitude != null;
+      const bHasCoords = b.doctor_latitude != null && b.doctor_longitude != null;
+      if (!aHasCoords && !bHasCoords) return 0;
+      if (!aHasCoords) return 1;
+      if (!bHasCoords) return -1;
+      const aDist = haversineDistance(userPos.lat, userPos.lng, a.doctor_latitude!, a.doctor_longitude!);
+      const bDist = haversineDistance(userPos.lat, userPos.lng, b.doctor_latitude!, b.doctor_longitude!);
+      return aDist - bDist;
+    });
+  }, [filtered, sortByDistance, userPos]);
 
   const todayCount = visits.filter((v) => isToday(v.checked_in_at) || isToday(v.planned_at)).length;
+  const tomorrowCount = visits.filter((v) => isTomorrow(v.planned_at)).length;
+  const weekCount = visits.filter((v) => isThisWeek(v.planned_at) || isThisWeek(v.checked_in_at)).length;
   const yesterdayCount = visits.filter((v) => isYesterday(v.checked_in_at) || isYesterday(v.planned_at)).length;
   const completedCount = visits.filter((v) => v.status === "COMPLETED").length;
   const plannedCount = visits.filter((v) => v.status === "PLANNED").length;
 
-  const nextVisitId = useMemo(() => {
-    const now = Date.now();
-    const upcoming = filtered.find((v) => v.status === "PLANNED" && getPlannedTime(v) >= now);
-    return upcoming?.id || null;
-  }, [filtered]);
-
   const historyByDate = useMemo(() => {
     if (filter !== "all") return {};
     const grouped: Record<string, Visit[]> = {};
-    filtered.forEach((v) => {
+    sortedList.forEach((v) => {
       const d = getVisitDate(v);
       if (d) { if (!grouped[d]) grouped[d] = []; grouped[d].push(v); }
     });
     return grouped;
-  }, [filtered, filter]);
+  }, [sortedList, filter]);
 
-  const activeFilters = useMemo(() => {
-    const pills: { key: FilterMode; label: string; count: number }[] = [
-      { key: "today", label: "اليوم", count: todayCount },
-    ];
-    if (yesterdayCount > 0) pills.push({ key: "yesterday", label: "أمس", count: yesterdayCount });
-    if (plannedCount > 0 && filter !== "today") pills.push({ key: "planned", label: "مخططة", count: plannedCount });
-    if (completedCount > 0) pills.push({ key: "completed", label: "مكتملة", count: completedCount });
-    return pills;
-  }, [todayCount, yesterdayCount, completedCount, plannedCount, filter]);
+  const quickFilters: { key: FilterMode; label: string; count: number }[] = [
+    { key: "today", label: "اليوم", count: todayCount },
+    { key: "tomorrow", label: "غدًا", count: tomorrowCount },
+    { key: "week", label: "الأسبوع ده", count: weekCount },
+  ];
+
+  const moreFilters: { key: FilterMode; label: string; count: number }[] = [
+    { key: "yesterday", label: "أمس", count: yesterdayCount },
+    { key: "planned", label: "مخططة", count: plannedCount },
+    { key: "completed", label: "مكتملة", count: completedCount },
+    { key: "all", label: "الكل", count: visits.length },
+  ].filter((f) => f.count > 0);
 
   return (
     <div className="space-y-4 pb-24">
@@ -231,7 +300,7 @@ export default function VisitsListPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">زياراتي</h1>
         <p className="text-sm text-slate-600 mt-0.5">
-          {loading ? "جاري التحميل..." : `${filtered.length} / ${visits.length} زيارة`}
+          {loading ? "جاري التحميل..." : `${sortedList.length} / ${visits.length} زيارة`}
         </p>
       </div>
 
@@ -251,13 +320,13 @@ export default function VisitsListPage() {
         </Link>
       )}
 
-      {/* Filter pills - only non-zero counts */}
+      {/* Quick filter chips + date picker toggle */}
       <div className="flex items-center gap-2">
         <div className="flex gap-1.5 flex-1 overflow-x-auto pb-1">
-          {activeFilters.map((t) => {
+          {quickFilters.map((t) => {
             const on = filter === t.key;
             return (
-              <button key={t.key} onClick={() => setFilter(t.key)}
+              <button key={t.key} onClick={() => { setFilter(t.key); setShowDatePicker(false); setDateFrom(""); setDateTo(""); }}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition border whitespace-nowrap ${on ? "bg-sky-500 text-white border-sky-500 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:border-sky-300"}`}>
                 {t.label}
                 <span className={`text-[10px] tabular-nums ${on ? "text-white/80" : "text-slate-400"}`}>{t.count}</span>
@@ -265,34 +334,72 @@ export default function VisitsListPage() {
             );
           })}
         </div>
-        <button onClick={() => setShowMoreFilters(!showMoreFilters)}
-          className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-500 border-slate-200 hover:border-sky-300 transition whitespace-nowrap">
-          {showMoreFilters ? "إخفاء" : "المزيد"}
+        <button onClick={() => { setShowDatePicker(!showDatePicker); if (!showDatePicker) setFilter("all"); }}
+          className={`p-2 rounded-xl border transition ${showDatePicker ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-500 border-slate-200 hover:border-sky-300"}`}>
+          <Icon d={icons.calendar} size={16} />
         </button>
+        {moreFilters.length > 0 && (
+          <button onClick={() => setShowMoreFilters(!showMoreFilters)}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-500 border-slate-200 hover:border-sky-300 transition whitespace-nowrap">
+            {showMoreFilters ? "إخفاء" : "المزيد"}
+          </button>
+        )}
       </div>
 
-      {showMoreFilters && (
-        <div className="flex flex-wrap gap-2">
-          {filter !== "today" && <button onClick={() => setFilter("today")} className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-600 border-slate-200">اليوم ({todayCount})</button>}
-          {filter !== "yesterday" && <button onClick={() => setFilter("yesterday")} className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-600 border-slate-200">أمس ({yesterdayCount})</button>}
-          {filter !== "planned" && <button onClick={() => setFilter("planned")} className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-600 border-slate-200">مخططة ({plannedCount})</button>}
-          {filter !== "completed" && <button onClick={() => setFilter("completed")} className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-600 border-slate-200">مكتملة ({completedCount})</button>}
-          {filter !== "all" && <button onClick={() => setFilter("all")} className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white text-slate-600 border-slate-200">الكل ({visits.length})</button>}
+      {/* Sort toggle */}
+      {userPos && (
+        <div className="flex items-center gap-2">
+          <button onClick={() => setSortByDistance(false)}
+            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${!sortByDistance ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-600 border-slate-200 hover:border-sky-300"}`}>
+            <span className="inline-flex items-center gap-1.5 justify-center">
+              <Icon d={icons.calendar} size={13} /> حسب الموعد
+            </span>
+          </button>
+          <button onClick={() => setSortByDistance(true)}
+            className={`flex-1 py-2 rounded-xl text-xs font-semibold transition border ${sortByDistance ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-600 border-slate-200 hover:border-sky-300"}`}>
+            <span className="inline-flex items-center gap-1.5 justify-center">
+              <Icon d={icons.navigation} size={13} /> رتّب حسب الأقرب
+            </span>
+          </button>
         </div>
       )}
 
-      {filter === "all" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-500">من:</span>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700" />
-          <span className="text-xs text-slate-500">إلى:</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700" />
-          {(dateFrom || dateTo) && (
-            <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-              className="text-xs text-sky-600 font-medium hover:underline">مسح</button>
-          )}
+      {/* More filters panel */}
+      {showMoreFilters && moreFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {moreFilters.map((f) => (
+            <button key={f.key} onClick={() => { setFilter(f.key); setShowDatePicker(false); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${filter === f.key ? "bg-sky-500 text-white border-sky-500" : "bg-white text-slate-600 border-slate-200"}`}>
+              {f.label} ({f.count})
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Custom date range picker */}
+      {showDatePicker && (
+        <div className="rounded-xl bg-white border border-slate-200 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 w-8">من:</span>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 w-8">إلى:</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white text-slate-700" />
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="text-xs text-sky-600 font-medium hover:underline">مسح</button>
+            )}
+            <div className="flex-1" />
+            <button onClick={() => setShowDatePicker(false)}
+              className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800">
+              تطبيق
+            </button>
+          </div>
         </div>
       )}
 
@@ -310,7 +417,7 @@ export default function VisitsListPage() {
             </div>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : sortedList.length === 0 ? (
         <div className="rounded-2xl bg-white border border-slate-200 p-12 text-center">
           <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-4">
             <Icon d={icons.visits} size={26} />
@@ -318,6 +425,8 @@ export default function VisitsListPage() {
           <div className="text-base font-semibold text-slate-900 mb-1">لا توجد زيارات</div>
           <p className="text-xs text-slate-500 mb-4">
             {filter === "today" && "مفيش زيارات النهاردة"}
+            {filter === "tomorrow" && "مفيش زيارات بكرة"}
+            {filter === "week" && "مفيش زيارات الأسبوع ده"}
             {filter === "yesterday" && "مفيش زيارات أمس"}
             {filter === "planned" && "مفيش زيارات مخططة"}
             {filter === "completed" && "مفيش زيارات مكتملة"}
@@ -334,15 +443,15 @@ export default function VisitsListPage() {
                 <span className="text-[10px] text-slate-400">({dayVisits.length} زيارة)</span>
               </div>
               <div className="space-y-2">{dayVisits.map((v) => (
-                <VisitCard key={v.id} visit={v} userPos={userPos} isNext={v.id === nextVisitId}
+                <VisitCard key={v.id} visit={v} userPos={userPos} isNext={v.id === filtered.nextId}
                   justCheckedIn={checkedInIds.has(v.id)} onStartVisit={handleStartVisit} />
               ))}</div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="space-y-2.5">{filtered.map((v) => (
-          <VisitCard key={v.id} visit={v} userPos={userPos} isNext={v.id === nextVisitId}
+        <div className="space-y-2.5">{sortedList.map((v) => (
+          <VisitCard key={v.id} visit={v} userPos={userPos} isNext={v.id === filtered.nextId}
             justCheckedIn={checkedInIds.has(v.id)} onStartVisit={handleStartVisit} />
         ))}</div>
       )}

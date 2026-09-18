@@ -68,17 +68,21 @@ export default function SuperAdminPage() {
   useEffect(() => {
     const token = getToken();
     if (!token) { router.push("/login"); return; }
+    let cancelled = false;
     (async () => {
       try {
         await Promise.all([loadStats(), loadOrgs()]);
       } catch (e: any) {
-        setError(e?.message || "Access denied");
-        setTimeout(() => router.push("/admin"), 2000);
+        if (!cancelled) {
+          setError(e?.message || "Access denied");
+          setTimeout(() => { if (!cancelled) router.push("/admin"); }, 2000);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [router]);
+    return () => { cancelled = true; };
+  }, []);
 
   function logout() {
     clearToken();
@@ -789,11 +793,19 @@ function ImportDoctorsTab() {
   }
 
   useEffect(() => {
-    Promise.all([loadStats(), loadDoctors()]);
+    let cancelled = false;
+    (async () => {
+      await Promise.all([loadStats(), loadDoctors()]);
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    loadDoctors();
+    let cancelled = false;
+    (async () => {
+      await loadDoctors();
+    })();
+    return () => { cancelled = true; };
   }, [search, specialtyFilter]);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {

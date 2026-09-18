@@ -1067,7 +1067,7 @@ function ImportDoctorsTab() {
                   <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">التخصص</th>
                   <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">الهاتف</th>
                   <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">المدينة</th>
-                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">المنطقة</th>
+                  <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">العنوان</th>
                   <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300"></th>
                 </tr>
               </thead>
@@ -1095,7 +1095,7 @@ function ImportDoctorsTab() {
                     </td>
                     <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400" dir="ltr">{d.phone || "—"}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">{d.city || "—"}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">{d.area || "—"}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400 max-w-[200px] truncate" title={d.address || ""}>{d.address || "—"}</td>
                     <td className="px-4 py-2.5">
                       <button
                         onClick={() => handleDelete(d.id, d.full_name)}

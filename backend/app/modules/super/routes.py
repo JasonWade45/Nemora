@@ -689,12 +689,20 @@ async def import_platform_doctors(
     header = [str(h).strip().lower() if h else "" for h in rows[0]]
 
     field_map = {
+        "entity_type": ["entity_type"],
         "name": ["name", "الاسم", "full_name", "doctor_name", "اسم الدكتور"],
+        "main_specialty": ["main_specialty"],
+        "sub_specialty": ["sub_specialty"],
         "specialty": ["specialty", "التخصص", "specialization", "department", "القسم"],
+        "phone_1": ["phone_1"],
+        "all_phones": ["all_phones"],
+        "hotline": ["hotline"],
         "phone": ["phone", "الهاتف", "tel", "mobile", "جوال", "موبايل"],
         "email": ["email", "البريد", "mail"],
+        "governorate": ["governorate"],
         "address": ["address", "العنوان", "clinic_address"],
-        "city": ["city", "المدينة", "المدينة"],
+        "geocoded_address": ["geocoded_address"],
+        "city": ["city", "المدينة"],
         "area": ["area", "المنطقة", "region", "district"],
         "latitude": ["latitude", "lat", "خط العرض"],
         "longitude": ["longitude", "lng", "lon", "خط الطول"],
@@ -724,19 +732,38 @@ async def import_platform_doctors(
             if not raw_name:
                 continue
 
+            # Filter: only import Doctors (skip Hospitals/Clinics if entity_type exists)
+            if "entity_type" in col_indices:
+                entity_type = str(row[col_indices["entity_type"]] or "").strip().lower()
+                if entity_type and entity_type not in ("doctor", "طبيب", "دكتور"):
+                    continue
+
             first_name, last_name = _split_name(raw_name)
 
+            # Specialty: merge main_specialty + sub_specialty
             specialty = None
-            if "specialty" in col_indices:
+            if "main_specialty" in col_indices:
+                main_sp = _normalize_specialty(str(row[col_indices["main_specialty"]] or ""))
+                sub_sp = _normalize_specialty(str(row[col_indices.get("sub_specialty", -1)] or "")) if "sub_specialty" in col_indices else None
+                if main_sp and sub_sp and sub_sp.lower() != main_sp.lower():
+                    specialty = f"{main_sp} - {sub_sp}"
+                elif main_sp:
+                    specialty = main_sp
+                elif sub_sp:
+                    specialty = sub_sp
+            elif "specialty" in col_indices:
                 specialty = _normalize_specialty(str(row[col_indices["specialty"]] or ""))
 
+            # Phone: try all_phones, then phone_1, then hotline, then phone
             phone = None
-            if "phone" in col_indices:
-                raw_phone = str(row[col_indices["phone"]] or "").strip()
-                if raw_phone:
-                    if raw_phone.startswith("+20"):
-                        raw_phone = "0" + raw_phone[3:]
-                    phone = raw_phone[:50]
+            for phone_field in ["all_phones", "phone_1", "phone", "hotline"]:
+                if phone_field in col_indices:
+                    raw_phone = str(row[col_indices[phone_field]] or "").strip()
+                    if raw_phone and raw_phone != "None":
+                        if raw_phone.startswith("+20"):
+                            raw_phone = "0" + raw_phone[3:]
+                        phone = raw_phone[:50]
+                        break
 
             email = None
             if "email" in col_indices:
@@ -744,13 +771,19 @@ async def import_platform_doctors(
                 if raw_email and "@" in raw_email:
                     email = raw_email[:320]
 
+            # Address: prefer address, fallback to geocoded_address
             address = None
             if "address" in col_indices:
                 address = str(row[col_indices["address"]] or "").strip()[:255] or None
+            if not address and "geocoded_address" in col_indices:
+                address = str(row[col_indices["geocoded_address"]] or "").strip()[:255] or None
 
+            # City: prefer city, fallback to governorate
             city = None
             if "city" in col_indices:
                 city = str(row[col_indices["city"]] or "").strip()[:120] or None
+            if not city and "governorate" in col_indices:
+                city = str(row[col_indices["governorate"]] or "").strip()[:120] or None
 
             area = None
             if "area" in col_indices:

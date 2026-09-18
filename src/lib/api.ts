@@ -1004,6 +1004,18 @@ export async function deletePlatformDoctor(id: string): Promise<void> {
   await apiFetch(`/api/super/doctors/${id}`, { method: "DELETE" });
 }
 
+export async function deleteAllPlatformDoctors(): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>("/api/super/doctors/all", { method: "DELETE" });
+}
+
+export async function bulkDeleteDoctors(ids: string[]): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>("/api/super/doctors/bulk-delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ids),
+  });
+}
+
 // ============ Sales ============
 
 export type SaleStatus = "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED";

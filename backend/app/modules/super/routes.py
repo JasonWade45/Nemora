@@ -859,15 +859,38 @@ async def import_platform_doctors(
     )
 
 
+@router.delete("/doctors/all", status_code=status.HTTP_204_NO_CONTENT)
+def delete_all_platform_doctors(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_super_admin),
+):
+    count = db.query(Doctor).filter(Doctor.is_platform == True).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": count}
+
+
+@router.post("/doctors/bulk-delete", status_code=status.HTTP_200_OK)
+def bulk_delete_doctors(
+    ids: list[str],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_super_admin),
+):
+    if not ids:
+        return {"deleted": 0}
+    count = db.query(Doctor).filter(Doctor.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": count}
+
+
 @router.delete("/doctors/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_platform_doctor(
     doctor_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(_require_super_admin),
 ):
-    doctor = db.query(Doctor).filter(Doctor.id == doctor_id, Doctor.is_platform == True).first()
+    doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     if not doctor:
-        raise HTTPException(status_code=404, detail="Doctor not found or not a platform doctor")
+        raise HTTPException(status_code=404, detail="Doctor not found")
     db.delete(doctor)
     db.commit()
     return None

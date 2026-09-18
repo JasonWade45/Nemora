@@ -15,6 +15,8 @@ import {
   activateOrganization,
   broadcastNotification,
   clearToken,
+  deleteAllPlatformDoctors,
+  bulkDeleteDoctors,
   deletePlatformDoctor,
   getOrganization,
   getPlatformAnalytics,
@@ -771,6 +773,8 @@ function ImportDoctorsTab() {
   const [search, setSearch] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   async function loadStats() {
     try {
@@ -842,6 +846,53 @@ function ImportDoctorsTab() {
       alert(err.message || "فشل الحذف");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === doctors.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(doctors.map((d) => d.id)));
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`هل أنت متأكد من حذف ${selectedIds.size} دكتور؟`)) return;
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteDoctors(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      await Promise.all([loadStats(), loadDoctors()]);
+    } catch (err: any) {
+      alert(err.message || "فشل الحذف");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function handleDeleteAll() {
+    if (!confirm("هل أنت متأكد من حذف جميع الدكاترة من المنصة؟")) return;
+    if (!confirm("تأكيد نهائي — لن يمكن التراجع!")) return;
+    setBulkDeleting(true);
+    try {
+      await deleteAllPlatformDoctors();
+      setSelectedIds(new Set());
+      await Promise.all([loadStats(), loadDoctors()]);
+    } catch (err: any) {
+      alert(err.message || "فشل الحذف");
+    } finally {
+      setBulkDeleting(false);
     }
   }
 
@@ -960,17 +1011,37 @@ function ImportDoctorsTab() {
 
       {/* Doctors Table */}
       <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
             الدكاترة ({doctors.length})
           </h3>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث بالاسم أو التخصص أو الهاتف..."
-            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs w-64 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectedIds.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {bulkDeleting ? "جاري الحذف..." : `حذف المحدد (${selectedIds.size})`}
+              </button>
+            )}
+            {doctors.length > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                disabled={bulkDeleting}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 border border-red-200"
+              >
+                حذف الكل
+              </button>
+            )}
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="بحث بالاسم أو التخصص أو الهاتف..."
+              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs w-64 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+            />
+          </div>
         </div>
 
         {loading ? (
@@ -984,6 +1055,14 @@ function ImportDoctorsTab() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                 <tr>
+                  <th className="px-4 py-2.5 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={doctors.length > 0 && selectedIds.size === doctors.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-slate-300"
+                    />
+                  </th>
                   <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">الاسم</th>
                   <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">التخصص</th>
                   <th className="text-start px-4 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300">الهاتف</th>
@@ -994,7 +1073,15 @@ function ImportDoctorsTab() {
               </thead>
               <tbody>
                 {doctors.map((d) => (
-                  <tr key={d.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                  <tr key={d.id} className={`border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition ${selectedIds.has(d.id) ? "bg-sky-50 dark:bg-sky-950/30" : ""}`}>
+                    <td className="px-4 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(d.id)}
+                        onChange={() => toggleSelect(d.id)}
+                        className="rounded border-slate-300"
+                      />
+                    </td>
                     <td className="px-4 py-2.5">
                       <div className="font-medium text-slate-900 dark:text-white">{d.full_name}</div>
                       {d.email && <div className="text-[10px] text-slate-400" dir="ltr">{d.email}</div>}

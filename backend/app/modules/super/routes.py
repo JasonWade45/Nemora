@@ -512,7 +512,8 @@ def system_health(
     current_user: User = Depends(_require_super_admin),
 ):
     try:
-        db.execute(func.now().select() if False else "SELECT 1")
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
         db_ok = True
     except Exception:
         db_ok = False

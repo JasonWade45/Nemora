@@ -746,6 +746,8 @@ export type OrganizationSummary = {
   id: string;
   name: string;
   slug: string;
+  status: string;
+  plan: string;
   users_count: number;
   doctors_count: number;
   visits_count: number;

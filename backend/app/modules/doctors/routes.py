@@ -276,6 +276,33 @@ def create_doctor(
     return _doctor_to_response(doctor)
 
 
+@router.get("/areas/list", response_model=list[dict])
+def list_areas(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
+):
+    from sqlalchemy import func as sqlfunc
+    rows = db.query(
+        Doctor.area,
+        sqlfunc.count(Doctor.id).label("cnt"),
+    ).filter(
+        or_(
+            Doctor.organization_id == current_user.organization_id,
+            and_(Doctor.is_platform == True, Doctor.organization_id.is_(None)),
+        ),
+    ).group_by(Doctor.area).all()
+
+    result = []
+    for (area, cnt) in rows:
+        result.append({
+            "area": area if area else None,
+            "label": area if area else "غير محدد",
+            "count": cnt,
+        })
+    result.sort(key=lambda x: (x["area"] is None, -x["count"]))
+    return result
+
+
 @router.get("/{doctor_id}", response_model=DoctorResponse)
 def get_doctor(
     doctor_id: str,
@@ -416,33 +443,6 @@ def list_doctor_workplaces(
         )
         for workplace in workplaces
     ]
-
-
-@router.get("/areas/list", response_model=list[dict])
-def list_areas(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(Role.ADMIN, Role.MANAGER, Role.MEDICAL_REP)),
-):
-    from sqlalchemy import func as sqlfunc
-    rows = db.query(
-        Doctor.area,
-        sqlfunc.count(Doctor.id).label("cnt"),
-    ).filter(
-        or_(
-            Doctor.organization_id == current_user.organization_id,
-            and_(Doctor.is_platform == True, Doctor.organization_id.is_(None)),
-        ),
-    ).group_by(Doctor.area).all()
-
-    result = []
-    for (area, cnt) in rows:
-        result.append({
-            "area": area if area else None,
-            "label": area if area else "غير محدد",
-            "count": cnt,
-        })
-    result.sort(key=lambda x: (x["area"] is None, -x["count"]))
-    return result
 
 
 @router.post("/discover", response_model=DoctorResponse, status_code=status.HTTP_201_CREATED)
